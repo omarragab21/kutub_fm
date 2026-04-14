@@ -31,7 +31,11 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
-/assets/
+/assets/*
+!/assets/fonts/
+/assets/fonts/*
+!/assets/fonts/google_fonts/
+!/assets/fonts/google_fonts/*.ttf
 /coverage/
 
 # Symbolication related

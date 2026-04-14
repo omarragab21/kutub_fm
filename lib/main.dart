@@ -3,6 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kutub_fm/features/profile/data/repositories/profile_repository.dart';
 import 'package:kutub_fm/features/profile/presentation/viewmodels/profile_viewmodel.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/apple_pay_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/credit_card_payment_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/google_play_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/wallet_payment_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/repositories_impl/payment_repository_impl.dart';
+import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
 import 'core/layout/app_shell.dart';
 import 'core/navigation/app_navigation_service.dart';
 import 'core/navigation/app_navigation_state.dart';
@@ -24,7 +30,7 @@ import 'package:kutub_fm/features/podcast/presentation/providers/podcast_provide
 // FM radio: `AppRoutes.fmRadio` (list), `AppRoutes.fmStationDetail` (pass `FmStation` as route arguments).
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Disable runtime fetching to use bundled fonts and avoid SocketException
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -57,6 +63,16 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => ProfileViewModel(repository: ProfileRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SubscriptionProvider(
+            repository: PaymentRepositoryImpl(
+              applePayDataSource: ApplePayDataSource(),
+              googlePlayDataSource: GooglePlayDataSource(),
+              walletDataSource: WalletPaymentDataSource(),
+              creditCardDataSource: CreditCardPaymentDataSource(),
+            ),
+          ),
         ),
       ],
       child: const KutubFmApp(),

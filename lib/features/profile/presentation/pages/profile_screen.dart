@@ -5,6 +5,13 @@ import '../../../../core/theme/app_theme.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../widgets/profile_widgets.dart';
 import 'edit_profile_screen.dart';
+import 'package:kutub_fm/features/subscription/presentation/screens/subscription_screen.dart';
+import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
+import 'package:kutub_fm/features/subscription/data/repositories_impl/payment_repository_impl.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/apple_pay_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/google_play_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/wallet_payment_data_source.dart';
+import 'package:kutub_fm/features/subscription/data/datasources/credit_card_payment_data_source.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -70,6 +77,30 @@ class _ProfileView extends StatelessWidget {
               ),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.workspace_premium,
+                  color: Color(0xFFD4AF37),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider(
+                        create: (_) => SubscriptionProvider(
+                          repository: PaymentRepositoryImpl(
+                            applePayDataSource: ApplePayDataSource(),
+                            googlePlayDataSource: GooglePlayDataSource(),
+                            walletDataSource: WalletPaymentDataSource(),
+                            creditCardDataSource: CreditCardPaymentDataSource(),
+                          ),
+                        ),
+                        child: const SubscriptionScreen(),
+                      ),
+                    ),
+                  );
+                },
+              ),
               if (viewModel.isSaving)
                 const Padding(
                   padding: EdgeInsets.only(right: 16),
