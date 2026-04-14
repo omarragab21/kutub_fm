@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
@@ -7,8 +8,15 @@ import '../widgets/active_users_bar.dart';
 import '../widgets/post_card.dart';
 import 'reader_post_detail_screen.dart';
 
-class ReaderSessionsScreen extends StatelessWidget {
+class ReaderSessionsScreen extends StatefulWidget {
   const ReaderSessionsScreen({super.key});
+
+  @override
+  State<ReaderSessionsScreen> createState() => _ReaderSessionsScreenState();
+}
+
+class _ReaderSessionsScreenState extends State<ReaderSessionsScreen> {
+  bool _isFabVisible = true;
 
   @override
   Widget build(BuildContext context) {
@@ -18,17 +26,28 @@ class ReaderSessionsScreen extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFF090806),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.of(context).pushNamed(AppRoutes.readerCreatePost);
-          },
-          backgroundColor: const Color(0xFFD9AF68),
-          foregroundColor: Colors.black,
-          label: const Text(
-            'منشور جديد',
-            style: TextStyle(fontWeight: FontWeight.w800),
+        floatingActionButton: AnimatedSlide(
+          duration: const Duration(milliseconds: 300),
+          offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: _isFabVisible ? 1.0 : 0.0,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 60.0),
+              child: FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.of(context).pushNamed(AppRoutes.readerCreatePost);
+                },
+                backgroundColor: const Color(0xFFD9AF68),
+                foregroundColor: Colors.black,
+                label: const Text(
+                  'منشور جديد',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                icon: const Icon(Icons.edit_rounded),
+              ),
+            ),
           ),
-          icon: const Icon(Icons.edit_rounded),
         ),
         body: Stack(
           children: [
@@ -36,53 +55,68 @@ class ReaderSessionsScreen extends StatelessWidget {
             SafeArea(
               child: provider.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : CustomScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                            child: _FeedHeader(provider: provider),
+                  : NotificationListener<UserScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.direction == ScrollDirection.idle) {
+                          if (!_isFabVisible) {
+                            setState(() => _isFabVisible = true);
+                          }
+                        } else {
+                          if (_isFabVisible) {
+                            setState(() => _isFabVisible = false);
+                          }
+                        }
+                        return false;
+                      },
+                      child: CustomScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                              child: _FeedHeader(provider: provider),
+                            ),
                           ),
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
-                          sliver: SliverList.separated(
-                            itemCount: provider.posts.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 16),
-                            itemBuilder: (context, index) {
-                              final post = provider.posts[index];
-                              return _Reveal(
-                                delay: Duration(milliseconds: 40 * index),
-                                child: PostCard(
-                                  post: post,
-                                  timestampLabel: provider.formatTimestamp(
-                                    post.createdAt,
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+                            sliver: SliverList.separated(
+                              itemCount: provider.posts.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 16),
+                              itemBuilder: (context, index) {
+                                final post = provider.posts[index];
+                                return _Reveal(
+                                  delay: Duration(milliseconds: 40 * index),
+                                  child: PostCard(
+                                    post: post,
+                                    timestampLabel: provider.formatTimestamp(
+                                      post.createdAt,
+                                    ),
+                                    onTap: () {
+                                      Navigator.of(context).pushNamed(
+                                        AppRoutes.readerPostDetail,
+                                        arguments: ReaderPostDetailArgs(
+                                          postId: post.id,
+                                        ),
+                                      );
+                                    },
+                                    onLikeTap: () =>
+                                        provider.toggleLike(post.id),
+                                    onCommentTap: () {
+                                      Navigator.of(context).pushNamed(
+                                        AppRoutes.readerPostDetail,
+                                        arguments: ReaderPostDetailArgs(
+                                          postId: post.id,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  onTap: () {
-                                    Navigator.of(context).pushNamed(
-                                      AppRoutes.readerPostDetail,
-                                      arguments: ReaderPostDetailArgs(
-                                        postId: post.id,
-                                      ),
-                                    );
-                                  },
-                                  onLikeTap: () => provider.toggleLike(post.id),
-                                  onCommentTap: () {
-                                    Navigator.of(context).pushNamed(
-                                      AppRoutes.readerPostDetail,
-                                      arguments: ReaderPostDetailArgs(
-                                        postId: post.id,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ],
