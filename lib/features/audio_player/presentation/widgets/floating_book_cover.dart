@@ -43,7 +43,7 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
     );
 
-    _shadowAnimation = Tween<double>(begin: 0.5, end: 0.8).animate(
+    _shadowAnimation = Tween<double>(begin: 0.1, end: 0.3).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
     );
 
@@ -92,6 +92,7 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                 width: 220,
                 height: 330, // 2:3 aspect ratio
                 decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05), // بلون خافت
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     // Primary shadow
@@ -99,19 +100,22 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                       color: Colors.black.withOpacity(_shadowAnimation.value),
                       blurRadius: 50,
                       spreadRadius: -15,
-                      offset: Offset(0, 25 + _verticalAnimation.value.abs() * 0.5),
+                      offset: Offset(
+                        0,
+                        25 + _verticalAnimation.value.abs() * 0.5,
+                      ),
                     ),
                     // Ambient glow effect when playing
                     if (widget.isPlaying)
                       BoxShadow(
-                        color: const Color(0xFFF2CA50).withOpacity(0.2),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+                        color: const Color(0xFFF2CA50).withOpacity(_shadowAnimation.value * 0.25), // 0.025 to 0.075 (faint animated glow)
+                        blurRadius: 40,
+                        spreadRadius: 8,
                         offset: const Offset(0, 0),
                       ),
-                    // Subtle colored shadow
+                    // Subtle colored shadow (faint)
                     BoxShadow(
-                      color: const Color(0xFFF2CA50).withOpacity(0.1),
+                      color: const Color(0xFFF2CA50).withOpacity(0.03),
                       blurRadius: 20,
                       spreadRadius: -5,
                       offset: const Offset(0, 10),
@@ -174,8 +178,14 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(20),
                                   gradient: LinearGradient(
-                                    begin: Alignment(-1.0 + _rotationAnimation.value * 10, -0.5),
-                                    end: Alignment(1.0 - _rotationAnimation.value * 10, 0.5),
+                                    begin: Alignment(
+                                      -1.0 + _rotationAnimation.value * 10,
+                                      -0.5,
+                                    ),
+                                    end: Alignment(
+                                      1.0 - _rotationAnimation.value * 10,
+                                      0.5,
+                                    ),
                                     colors: [
                                       Colors.white.withOpacity(0.1),
                                       Colors.transparent,

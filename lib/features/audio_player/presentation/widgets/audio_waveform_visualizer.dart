@@ -6,13 +6,11 @@ import '../../../../core/theme/app_theme.dart';
 class AudioWaveformVisualizer extends StatefulWidget {
   final bool isPlaying;
 
-  const AudioWaveformVisualizer({
-    super.key,
-    required this.isPlaying,
-  });
+  const AudioWaveformVisualizer({super.key, required this.isPlaying});
 
   @override
-  State<AudioWaveformVisualizer> createState() => _AudioWaveformVisualizerState();
+  State<AudioWaveformVisualizer> createState() =>
+      _AudioWaveformVisualizerState();
 }
 
 class _AudioWaveformVisualizerState extends State<AudioWaveformVisualizer>
@@ -27,16 +25,20 @@ class _AudioWaveformVisualizerState extends State<AudioWaveformVisualizer>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150), // Faster updates for smoother animation
-    )..addListener(() {
-        setState(() {});
-      });
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(
+            milliseconds: 150,
+          ), // Faster updates for smoother animation
+        )..addListener(() {
+          setState(() {});
+        });
 
-    _gradientAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.linear),
-    );
+    _gradientAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear));
 
     _generateHeights();
     _currentHeights = List.filled(_targetHeights.length, 4.0);
@@ -50,10 +52,10 @@ class _AudioWaveformVisualizerState extends State<AudioWaveformVisualizer>
   void _generateHeights() {
     // We draw ~50 bars for more detail
     _targetHeights = List.generate(50, (index) {
-      // Create more realistic wave patterns
-      final baseHeight = 20.0;
-      final variation = _random.nextDouble() * 30 + 10;
-      final waveInfluence = sin(index * 0.3) * 10;
+      // Create more realistic wave patterns (scaled up for background size)
+      final baseHeight = 130.0;
+      final variation = _random.nextDouble() * 200 + 50;
+      final waveInfluence = sin(index * 0.3) * 60;
       return baseHeight + variation + waveInfluence;
     });
   }
@@ -64,18 +66,18 @@ class _AudioWaveformVisualizerState extends State<AudioWaveformVisualizer>
 
   void _startAnimLoop() {
     if (!mounted) return;
-    
+
     // Smoothly interpolate current heights to target heights
     for (int i = 0; i < _targetHeights.length; i++) {
       final diff = _targetHeights[i] - _currentHeights[i];
       _currentHeights[i] += diff * 0.3; // Smooth interpolation
     }
-    
+
     // Occasionally generate new target heights for variation
     if (_random.nextDouble() < 0.1) {
       _generateHeights();
     }
-    
+
     _controller.forward(from: 0.0).then((_) {
       if (widget.isPlaying && mounted) {
         _startAnimLoop();
@@ -108,17 +110,20 @@ class _AudioWaveformVisualizerState extends State<AudioWaveformVisualizer>
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 80, // Increased height for better visibility
-      width: double.infinity,
-      child: ClipRect(
-        child: CustomPaint(
-          painter: _WaveformPainter(
-            heights: _currentHeights,
-            phaseOffsets: _phaseOffsets,
-            progress: _controller.value,
-            gradientProgress: _gradientAnimation.value,
-            isPlaying: widget.isPlaying,
+    return Opacity(
+      opacity: 0.2, // Reduced opacity for subtle background effect
+      child: SizedBox(
+        height: 500, // Greatly increased height to flow out from behind cover
+        width: double.infinity,
+        child: ClipRect(
+          child: CustomPaint(
+            painter: _WaveformPainter(
+              heights: _currentHeights,
+              phaseOffsets: _phaseOffsets,
+              progress: _controller.value,
+              gradientProgress: _gradientAnimation.value,
+              isPlaying: widget.isPlaying,
+            ),
           ),
         ),
       ),
@@ -152,27 +157,22 @@ class _WaveformPainter extends CustomPainter {
     final gradient = LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
-      colors: [
-        AppTheme.primary,
-        const Color(0xFFD4AF37),
-        AppTheme.primary,
-      ],
-      stops: [
-        0.0,
-        0.5 + sin(gradientProgress * 2 * pi) * 0.2,
-        1.0,
-      ],
+      colors: [AppTheme.primary, const Color(0xFFD4AF37), AppTheme.primary],
+      stops: [0.0, 0.5 + sin(gradientProgress * 2 * pi) * 0.2, 1.0],
     );
 
     for (int i = 0; i < heights.length; i++) {
       final x = i * spacing + (spacing / 2);
-      
+
       // Enhanced wave calculation with phase offsets
       double barH;
       if (isPlaying) {
         final waveInfluence = sin(progress * 2 * pi + phaseOffsets[i]) * 0.3;
         final pulseInfluence = sin(progress * 4 * pi + i * 0.1) * 0.2;
-        final heightMultiplier = (0.6 + waveInfluence + pulseInfluence).clamp(0.2, 1.0);
+        final heightMultiplier = (0.6 + waveInfluence + pulseInfluence).clamp(
+          0.2,
+          1.0,
+        );
         barH = heights[i] * heightMultiplier;
       } else {
         barH = 4.0; // Flat line when paused
@@ -183,20 +183,32 @@ class _WaveformPainter extends CustomPainter {
     }
   }
 
-  void _drawWaveBar(Canvas canvas, double x, double centerY, double barHeight, 
-      double spacing, Gradient gradient, int index, bool isPlaying) {
-    
+  void _drawWaveBar(
+    Canvas canvas,
+    double x,
+    double centerY,
+    double barHeight,
+    double spacing,
+    Gradient gradient,
+    int index,
+    bool isPlaying,
+  ) {
     // Background glow layer
     if (isPlaying) {
       final glowPaint = Paint()
         ..shader = gradient.createShader(
-          Rect.fromLTWH(x - spacing/2, centerY - barHeight/2, spacing, barHeight),
+          Rect.fromLTWH(
+            x - spacing / 2,
+            centerY - barHeight / 2,
+            spacing,
+            barHeight,
+          ),
         )
         ..strokeWidth = spacing * 0.8
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
         ..color = AppTheme.primary.withOpacity(0.3);
-      
+
       canvas.drawLine(
         Offset(x, centerY - barHeight / 2),
         Offset(x, centerY + barHeight / 2),
@@ -207,7 +219,12 @@ class _WaveformPainter extends CustomPainter {
     // Main bar with gradient
     final mainPaint = Paint()
       ..shader = gradient.createShader(
-        Rect.fromLTWH(x - spacing/2, centerY - barHeight/2, spacing, barHeight),
+        Rect.fromLTWH(
+          x - spacing / 2,
+          centerY - barHeight / 2,
+          spacing,
+          barHeight,
+        ),
       )
       ..strokeWidth = spacing * 0.6
       ..strokeCap = StrokeCap.round;
@@ -224,7 +241,7 @@ class _WaveformPainter extends CustomPainter {
         ..color = Colors.white.withOpacity(0.6)
         ..strokeWidth = spacing * 0.2
         ..strokeCap = StrokeCap.round;
-      
+
       canvas.drawLine(
         Offset(x, centerY - barHeight / 4),
         Offset(x, centerY + barHeight / 4),
@@ -235,8 +252,8 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WaveformPainter oldDelegate) {
-    return oldDelegate.progress != progress || 
-           oldDelegate.gradientProgress != gradientProgress || 
-           oldDelegate.isPlaying != isPlaying;
+    return oldDelegate.progress != progress ||
+        oldDelegate.gradientProgress != gradientProgress ||
+        oldDelegate.isPlaying != isPlaying;
   }
 }

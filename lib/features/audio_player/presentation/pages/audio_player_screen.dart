@@ -63,8 +63,8 @@ class _AudioPlayerViewState extends State<_AudioPlayerView>
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutQuart),
     );
 
     // Start animations
@@ -109,20 +109,25 @@ class _AudioPlayerViewState extends State<_AudioPlayerView>
                 },
                 itemBuilder: (context, index) {
                   return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 600),
+                    switchInCurve: Curves.easeOutExpo,
+                    switchOutCurve: Curves.easeInCubic,
                     transitionBuilder: (child, animation) {
-                      return SlideTransition(
-                        position:
-                            Tween<Offset>(
-                              begin: const Offset(0, 0.3),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
-                              ),
-                            ),
-                        child: FadeTransition(opacity: animation, child: child),
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.15),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: ScaleTransition(
+                            scale: Tween<double>(
+                              begin: 0.95,
+                              end: 1.0,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
                       );
                     },
                     child: AudioStoryItemWidget(
