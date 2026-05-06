@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class OnboardingData {
   final String badgeText;
@@ -23,7 +25,8 @@ class OnboardingDiscoverScreen extends StatefulWidget {
   const OnboardingDiscoverScreen({super.key});
 
   @override
-  State<OnboardingDiscoverScreen> createState() => _OnboardingDiscoverScreenState();
+  State<OnboardingDiscoverScreen> createState() =>
+      _OnboardingDiscoverScreenState();
 }
 
 class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
@@ -31,15 +34,19 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
   int _currentIndex = 0;
 
   // Hardcoded network images for visual variety
-  static const imageUrl1 = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAWnomrZ9M3v0Gze3wsZXthx0BaDD9XiI1sKgZsuUfh68xH3o_lBe5F87CGRz9Taa-LEq5unsxqrr-F32GvajSxjWZP_iR28dQ793DHASwthURPzfX1pHnUEzCYWfChclyERBsQKNaUYQ52uXTVlvI7tAfadbyxwpOesBasunlt7wI9D83JYg-Pk6N4NiyQQaYPpXkgfOXBMtcOsiCvw1MfaS59MVULF__dcXvB4-DXi8X56030yPNgcxwZai8GLcky5judAj89K4E';
-  static const imageUrl2 = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBI9OQO8Uq3aeRQGP4ogNHZP7emeqOVvxUTuYY8RIjAxkvarFrzIKrF9S-J7t-m2cZFDmjNSYks40aKDKwCHV_lxyzUZsH3qTeAqfuKd3oalC_GbgnVX9_E5IwezH3bKuxD9Cxdc553g4sG1m60LaTf1bnAX-igFtKA6Bbnp6WM27ZTXYDjRk98-I7Tvjwtku00oPCxZchYOzooXxLcm9UP4HtPX9ADiUgzc-muyQ7T7MkN9UP-UZ5AXwUSaupkE_sm4F6s8mMMbWE';
-  static const imageUrl3 = 'https://lh3.googleusercontent.com/aida-public/AB6AXuARLu3sUvZhY4fC_Ff6r3Bj3iElmhCOT15xP2ENjl6WP-ftHF6wQfGzYy8rfkmr3JIFZGE7AfU1UyHONNIgfSzPoyfopRLWmdXRQLKRgep9IK5Ys-FX_IyFFl34vaiH3p-5SupI_n2q7w2ywT4QK6g5U_Ua0hrVaauh1JC9uvxtTlU5ltpnJ30RDJEuTdSJR82pMzfyeJMSLvGLNP8-rHo9sqwnhLzoN68nVbzRZKlmb4iEFm472ntCIPnVDh62vavDIq560W8sUQs';
+  static const imageUrl1 =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAWnomrZ9M3v0Gze3wsZXthx0BaDD9XiI1sKgZsuUfh68xH3o_lBe5F87CGRz9Taa-LEq5unsxqrr-F32GvajSxjWZP_iR28dQ793DHASwthURPzfX1pHnUEzCYWfChclyERBsQKNaUYQ52uXTVlvI7tAfadbyxwpOesBasunlt7wI9D83JYg-Pk6N4NiyQQaYPpXkgfOXBMtcOsiCvw1MfaS59MVULF__dcXvB4-DXi8X56030yPNgcxwZai8GLcky5judAj89K4E';
+  static const imageUrl2 =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBI9OQO8Uq3aeRQGP4ogNHZP7emeqOVvxUTuYY8RIjAxkvarFrzIKrF9S-J7t-m2cZFDmjNSYks40aKDKwCHV_lxyzUZsH3qTeAqfuKd3oalC_GbgnVX9_E5IwezH3bKuxD9Cxdc553g4sG1m60LaTf1bnAX-igFtKA6Bbnp6WM27ZTXYDjRk98-I7Tvjwtku00oPCxZchYOzooXxLcm9UP4HtPX9ADiUgzc-muyQ7T7MkN9UP-UZ5AXwUSaupkE_sm4F6s8mMMbWE';
+  static const imageUrl3 =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuARLu3sUvZhY4fC_Ff6r3Bj3iElmhCOT15xP2ENjl6WP-ftHF6wQfGzYy8rfkmr3JIFZGE7AfU1UyHONNIgfSzPoyfopRLWmdXRQLKRgep9IK5Ys-FX_IyFFl34vaiH3p-5SupI_n2q7w2ywT4QK6g5U_Ua0hrVaauh1JC9uvxtTlU5ltpnJ30RDJEuTdSJR82pMzfyeJMSLvGLNP8-rHo9sqwnhLzoN68nVbzRZKlmb4iEFm472ntCIPnVDh62vavDIq560W8sUQs';
 
   final List<OnboardingData> _pages = [
     OnboardingData(
       badgeText: 'مكتبة رقمية متميزة',
       title: 'اكتشف عالم الكتب',
-      subtitle: 'آلاف العناوين العربية بين يديك، استمتع بالقراءة والاستماع في تجربة فريدة.',
+      subtitle:
+          'آلاف العناوين العربية بين يديك، استمتع بالقراءة والاستماع في تجربة فريدة.',
       centerImage: imageUrl2,
       leftImage: imageUrl1,
       rightImage: imageUrl3,
@@ -79,9 +86,25 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
     }
   }
 
+  Future<void> _continueAsGuest() async {
+    final authProvider = context.read<AuthProvider>();
+    await authProvider.continueAsGuest();
+
+    if (!mounted) return;
+    if (authProvider.status == AuthStatus.guest ||
+        authProvider.status == AuthStatus.authenticated) {
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+    } else if (authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(authProvider.errorMessage!)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLastPage = _currentIndex == _pages.length - 1;
 
     return Scaffold(
       body: Stack(
@@ -90,7 +113,9 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
           Positioned(
             top: MediaQuery.of(context).size.height * 0.25,
             right: -100,
-            child: _buildGlow(theme.colorScheme.primary.withValues(alpha: 0.05)),
+            child: _buildGlow(
+              theme.colorScheme.primary.withValues(alpha: 0.05),
+            ),
           ),
           Positioned(
             bottom: MediaQuery.of(context).size.height * 0.25,
@@ -115,24 +140,35 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
           // Fixed Bottom Controls (Gradient Overlay, Indicators, Button)
           Align(
             alignment: Alignment.bottomCenter,
-            child: Container(
-              height: 180,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.colorScheme.surface.withValues(alpha: 0.0),
-                    theme.colorScheme.surface.withValues(alpha: 0.8),
-                    theme.colorScheme.surface,
-                  ],
-                  stops: const [0.0, 0.4, 1.0],
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.colorScheme.surface.withValues(alpha: 0.0),
+                      theme.colorScheme.surface.withValues(alpha: 0.8),
+                      theme.colorScheme.surface,
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: 40.0,
+                      bottom: 20.0,
+                      left: 32.0,
+                      right: 32.0,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     // Page Indicator
                     Row(
@@ -145,11 +181,11 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     // CTA Button
                     SizedBox(
                       width: double.infinity,
-                      height: 64,
+                      height: 58,
                       child: ElevatedButton(
                         onPressed: _nextPage,
                         style: ElevatedButton.styleFrom(
@@ -159,14 +195,19 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                             borderRadius: BorderRadius.circular(32),
                           ),
                           elevation: 8,
-                          shadowColor: theme.colorScheme.primary.withValues(alpha: 0.4),
+                          shadowColor: theme.colorScheme.primary.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _currentIndex == _pages.length - 1 ? 'ابدأ الآن' : 'التالي',
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              isLastPage ? 'ابدأ الآن' : 'التالي',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             const Icon(Icons.arrow_back), // RTL direction arrow
@@ -174,11 +215,27 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                         ),
                       ),
                     ),
+                    if (isLastPage) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _continueAsGuest,
+                        child: Text(
+                          'الدخول كزائر',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
+
 
           // Fixed Header (Title & Skip)
           SafeArea(
@@ -210,7 +267,11 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
     );
   }
 
-  Widget _buildPageContent(BuildContext context, ThemeData theme, OnboardingData data) {
+  Widget _buildPageContent(
+    BuildContext context,
+    ThemeData theme,
+    OnboardingData data,
+  ) {
     return Stack(
       children: [
         // Images Parallax Display
@@ -234,7 +295,12 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                           opacity: 0.6,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.network(data.leftImage, width: 200, height: 300, fit: BoxFit.cover),
+                            child: Image.network(
+                              data.leftImage,
+                              width: 200,
+                              height: 300,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),
@@ -251,7 +317,12 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                           opacity: 0.8,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.network(data.rightImage, width: 200, height: 300, fit: BoxFit.cover),
+                            child: Image.network(
+                              data.rightImage,
+                              width: 200,
+                              height: 300,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),
@@ -273,7 +344,12 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(data.centerImage, width: 220, height: 350, fit: BoxFit.cover),
+                        child: Image.network(
+                          data.centerImage,
+                          width: 220,
+                          height: 350,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
@@ -287,23 +363,40 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
         Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 200.0, left: 32.0, right: 32.0),
+            padding: const EdgeInsets.only(
+              bottom: 200.0,
+              left: 32.0,
+              right: 32.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 // Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.4,
+                    ),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                    border: Border.all(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.1,
+                      ),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.auto_stories, color: theme.colorScheme.primary, size: 16),
+                      Icon(
+                        Icons.auto_stories,
+                        color: theme.colorScheme.primary,
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         data.badgeText,
@@ -347,13 +440,7 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
       height: 250,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 100,
-            spreadRadius: 50,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 100, spreadRadius: 50)],
       ),
     );
   }
@@ -364,10 +451,11 @@ class _OnboardingDiscoverScreenState extends State<OnboardingDiscoverScreen> {
       width: isActive ? 32 : 8,
       height: 6,
       decoration: BoxDecoration(
-        color: isActive ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
+        color: isActive
+            ? theme.colorScheme.primary
+            : theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(4),
       ),
     );
   }
 }
-

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../../../../core/routes/app_routes.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -9,23 +12,48 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _hasNavigated = false;
+
   @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
-      }
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authStatus = context.watch<AuthProvider>().status;
+    _navigateWhenReady(authStatus);
+  }
+
+  void _navigateWhenReady(AuthStatus status) {
+    if (_hasNavigated ||
+        status == AuthStatus.initial ||
+        status == AuthStatus.loading ||
+        status == AuthStatus.error) {
+      return;
+    }
+
+    _hasNavigated = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final route = switch (status) {
+        AuthStatus.guest || AuthStatus.authenticated => AppRoutes.home,
+        AuthStatus.emailNotVerified => AppRoutes.emailVerification,
+        AuthStatus.unauthenticated => AppRoutes.onboarding,
+        AuthStatus.initial ||
+        AuthStatus.loading ||
+        AuthStatus.error => AppRoutes.onboarding,
+      };
+
+      Navigator.pushReplacementNamed(context, route);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
+
     return Scaffold(
       body: Stack(
         children: [
-          // Ambient Glow
           Positioned.fill(
             child: Align(
               alignment: Alignment.center,
@@ -36,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      theme.colorScheme.primary.withOpacity(0.15),
+                      theme.colorScheme.primary.withValues(alpha: 0.15),
                       Colors.transparent,
                     ],
                   ),
@@ -44,12 +72,10 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
           ),
-          
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo Icon
                 Container(
                   width: 128,
                   height: 128,
@@ -65,7 +91,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.15),
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.15,
+                        ),
                         blurRadius: 32,
                         offset: const Offset(0, 8),
                       ),
@@ -80,23 +108,17 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ),
                 const SizedBox(height: 48),
-                
-                // Brand Name
                 ShaderMask(
                   blendMode: BlendMode.srcIn,
                   shaderCallback: (bounds) => LinearGradient(
                     colors: [
                       theme.colorScheme.primary,
-                      theme.colorScheme.primary, // using primary as secondary
                       theme.colorScheme.primaryContainer,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ).createShader(bounds),
-                  child: Text(
-                    'كتب FM',
-                    style: theme.textTheme.displayLarge,
-                  ),
+                  child: Text('كتب FM', style: theme.textTheme.displayLarge),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -106,9 +128,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                
                 const SizedBox(height: 80),
-                // Custom Loading Indicator
                 SizedBox(
                   width: 200,
                   child: LinearProgressIndicator(
@@ -119,16 +139,21 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'جاري تحميل مكتبتك الخاصة...',
+                  authProvider.status == AuthStatus.error
+                      ? authProvider.errorMessage ?? 'حدث خطأ أثناء المصادقة'
+                      : 'جاري تحميل مكتبتك الخاصة...',
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    color: authProvider.status == AuthStatus.error
+                        ? Colors.redAccent
+                        : theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.6,
+                          ),
                   ),
                 ),
               ],
             ),
           ),
-          
-          // Elements floating accents omitted for brevity but simple layout captured
         ],
       ),
     );

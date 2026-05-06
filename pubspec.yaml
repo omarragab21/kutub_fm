@@ -51,6 +51,12 @@ dependencies:
   http: ^1.6.0
   dio: ^5.9.2
   in_app_purchase: ^3.2.3
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  google_sign_in: ^6.2.1
+  cloud_firestore: ^6.3.0
+  firebase_storage: ^13.3.0
+  image_picker: ^1.2.2
 
 dev_dependencies:
   flutter_test:

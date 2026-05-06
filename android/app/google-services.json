@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "488612459446",
+    "project_id": "kutubfm-1ef89",
+    "storage_bucket": "kutubfm-1ef89.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:488612459446:android:f59b6a1be1bfe8f1794717",
+        "android_client_info": {
+          "package_name": "com.example.kutub_fm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA65UlQGyw_B5WUACVFjSxCKNZ_Tz7qSrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

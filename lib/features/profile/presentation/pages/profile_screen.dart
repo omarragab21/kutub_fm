@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kutub_fm/core/routes/app_routes.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../widgets/profile_widgets.dart';
 import 'edit_profile_screen.dart';
@@ -31,6 +32,7 @@ class _ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ProfileViewModel>();
+    final authProvider = context.watch<AuthProvider>();
 
     // Show error snackbar reactively
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,7 +56,18 @@ class _ProfileView extends StatelessWidget {
       );
     }
 
-    final profile = viewModel.profile!;
+    final firebaseUser = authProvider.user;
+    final firebaseName = firebaseUser?.displayName?.trim();
+    final profile = viewModel.profile!.copyWith(
+      name: authProvider.isGuest
+          ? 'زائر'
+          : (firebaseName != null && firebaseName.isNotEmpty
+                ? firebaseName
+                : viewModel.profile!.name),
+      bio: authProvider.isGuest
+          ? 'تستخدم كتب FM كزائر. أنشئ حساباً لاحقاً لحفظ تقدمك ومزامنة بياناتك.'
+          : viewModel.profile!.bio,
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -133,12 +146,21 @@ class _ProfileView extends StatelessWidget {
 
                 // ── Avatar & Name ────────────────────────────────────
                 Center(child: ProfileHeaderWidget(profile: profile)),
+                const SizedBox(height: 16),
+                _AuthAccountCard(
+                  email: firebaseUser?.email,
+                  isGuest: authProvider.isGuest,
+                  onLogin: () => Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false),
+                ),
                 const SizedBox(height: 20),
 
                 // ── Edit Profile Button ──────────────────────────────
-                Center(
-                  child: _EditButton(onTap: () => _openEditProfile(context)),
-                ),
+                if (!authProvider.isGuest)
+                  Center(
+                    child: _EditButton(onTap: () => _openEditProfile(context)),
+                  ),
                 const SizedBox(height: 28),
 
                 // ── Stats ────────────────────────────────────────────
@@ -166,10 +188,10 @@ class _ProfileView extends StatelessWidget {
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.12),
+                          color: AppTheme.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppTheme.primary.withOpacity(0.3),
+                            color: AppTheme.primary.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -213,7 +235,7 @@ class _ProfileView extends StatelessWidget {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 350),
-        pageBuilder: (_, animation, __) => FadeTransition(
+        pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
           opacity: animation,
           child: SlideTransition(
             position:
@@ -225,12 +247,25 @@ class _ProfileView extends StatelessWidget {
                 ),
             child: EditProfileScreen(
               profile: profile,
-              onSave: (name, bio, categories) {
-                viewModel.updateProfile(
-                  name: name,
-                  bio: bio,
-                  favoriteCategories: categories,
-                );
+              onSave: (name, bio, categories) async {
+                await Future.wait([
+                  viewModel.updateProfile(
+                    name: name,
+                    bio: bio,
+                    favoriteCategories: categories,
+                  ),
+                  context.read<AuthProvider>().updateProfileName(name),
+                ]);
+                if (!context.mounted) return;
+                final error = context.read<AuthProvider>().errorMessage;
+                if (error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
               },
             ),
           ),
@@ -241,6 +276,66 @@ class _ProfileView extends StatelessWidget {
 }
 
 // ─── Helper Widgets ───────────────────────────────────────────────────────────
+
+class _AuthAccountCard extends StatelessWidget {
+  const _AuthAccountCard({
+    required this.email,
+    required this.isGuest,
+    required this.onLogin,
+  });
+
+  final String? email;
+  final bool isGuest;
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isGuest ? Icons.person_outline_rounded : Icons.verified_user,
+            color: AppTheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isGuest ? 'حساب زائر' : 'حساب مفعل',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isGuest
+                      ? 'سجل الدخول أو أنشئ حساباً لحفظ بياناتك'
+                      : email ?? 'بريد غير متاح',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isGuest)
+            TextButton(onPressed: onLogin, child: const Text('تسجيل')),
+        ],
+      ),
+    );
+  }
+}
 
 class _SectionTitle extends StatelessWidget {
   final String title;
@@ -279,7 +374,7 @@ class _EditButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withOpacity(0.3),
+              color: AppTheme.primary.withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -325,7 +420,7 @@ class _AchievementsRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         itemCount: badges.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final b = badges[i];
           return AnimatedOpacity(
@@ -335,12 +430,12 @@ class _AchievementsRow extends StatelessWidget {
               width: 90,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: b.unlocked
-                      ? AppTheme.primary.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.08),
+                      ? AppTheme.primary.withValues(alpha: 0.3)
+                      : Colors.white.withValues(alpha: 0.08),
                 ),
               ),
               child: Column(
@@ -359,7 +454,7 @@ class _AchievementsRow extends StatelessWidget {
                   Text(
                     b.desc,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.45),
+                      color: Colors.white.withValues(alpha: 0.45),
                       fontSize: 9,
                     ),
                   ),

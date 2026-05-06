@@ -11,9 +11,8 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final profileViewModel = context.watch<ProfileViewModel>();
-    final authProvider = context.read<AuthProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final profile = profileViewModel.profile;
 
     return Directionality(
@@ -49,9 +48,11 @@ class SettingsScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -85,9 +86,11 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'user@example.com',
+                              authProvider.isGuest
+                                  ? 'حساب زائر'
+                                  : authProvider.user?.email ?? 'بريد غير متاح',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 fontSize: 13,
                               ),
                             ),
@@ -158,7 +161,7 @@ class SettingsScreen extends StatelessWidget {
                 child: Text(
                   'كتب FM - إصدار 1.0.0',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     fontSize: 12,
                     letterSpacing: 1,
                   ),
@@ -176,7 +179,7 @@ class SettingsScreen extends StatelessWidget {
     return Text(
       title,
       style: TextStyle(
-        color: AppTheme.primary.withOpacity(0.7),
+        color: AppTheme.primary.withValues(alpha: 0.7),
         fontSize: 14,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,

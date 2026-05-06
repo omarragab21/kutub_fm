@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../features/splash/presentation/pages/splash_screen.dart';
 import '../../features/onboarding/presentation/pages/onboarding_discover_screen.dart';
-import '../../features/auth/presentation/pages/login_screen.dart';
-import '../../features/auth/presentation/pages/register_screen.dart';
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/auth/presentation/pages/category_selection_screen.dart';
 import '../../features/home/presentation/pages/main_screen.dart';
 import '../../features/book_details/presentation/pages/book_details_page.dart';
@@ -24,6 +25,7 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String register = '/register';
+  static const String emailVerification = '/email-verification';
   static const String categorySelection = '/category_selection';
   static const String home = '/home';
   static const String bookDetails = '/book_details';
@@ -59,6 +61,11 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => const RegisterScreen(),
+        );
+      case emailVerification:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const EmailVerificationScreen(),
         );
       case categorySelection:
         return MaterialPageRoute(

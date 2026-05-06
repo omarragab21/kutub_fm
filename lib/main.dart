@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kutub_fm/features/profile/data/repositories/profile_repository.dart';
 import 'package:kutub_fm/features/profile/presentation/viewmodels/profile_viewmodel.dart';
@@ -19,6 +20,7 @@ import 'package:kutub_fm/features/auth/presentation/providers/auth_provider.dart
 import 'package:kutub_fm/features/home/presentation/viewmodels/home_view_model.dart';
 import 'package:kutub_fm/features/home/data/repositories/home_repository_impl.dart';
 import 'core/audio/audio_provider.dart';
+import 'firebase_options.dart';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -34,6 +36,8 @@ Future<void> main() async {
   // Disable runtime fetching to use bundled fonts and avoid SocketException
   GoogleFonts.config.allowRuntimeFetching = false;
 
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
     androidNotificationChannelName: 'Audio playback',
@@ -48,7 +52,9 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AudioProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => AppNavigationState()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider()..listenToAuthChanges(),
+        ),
         ChangeNotifierProxyProvider<AudioProvider, FmRadioProvider>(
           create: (_) => FmRadioProvider()..fetchStations(),
           update: (_, audioProvider, fmRadioProvider) {

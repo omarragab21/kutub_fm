@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/user_profile.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserProfile profile;
-  final void Function(String name, String bio, List<String> categories) onSave;
+  final FutureOr<void> Function(
+    String name,
+    String bio,
+    List<String> categories,
+  )
+  onSave;
 
   const EditProfileScreen({
     super.key,
@@ -24,8 +31,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaving = false;
 
   static const _allCategories = [
-    'تاريخ', 'فلسفة', 'رواية', 'علوم', 'تنمية', 'دين',
-    'سياسة', 'اقتصاد', 'أدب', 'شعر', 'تكنولوجيا', 'رياضة',
+    'تاريخ',
+    'فلسفة',
+    'رواية',
+    'علوم',
+    'تنمية',
+    'دين',
+    'سياسة',
+    'اقتصاد',
+    'أدب',
+    'شعر',
+    'تكنولوجيا',
+    'رياضة',
   ];
 
   @override
@@ -47,7 +64,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
     await Future.delayed(const Duration(milliseconds: 200));
-    widget.onSave(
+    await widget.onSave(
       _nameController.text.trim(),
       _bioController.text.trim(),
       _selectedCategories,
@@ -106,7 +123,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         color: AppTheme.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt, color: Colors.black, size: 16),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.black,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ],
@@ -159,16 +180,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppTheme.primary.withOpacity(0.15)
-                          : Colors.white.withOpacity(0.05),
+                          ? AppTheme.primary.withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected
                             ? AppTheme.primary
-                            : Colors.white.withOpacity(0.12),
+                            : Colors.white.withValues(alpha: 0.12),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -177,7 +201,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       style: TextStyle(
                         color: isSelected ? AppTheme.primary : Colors.white60,
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -190,15 +216,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Sticky Save Button
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(
-            24, 16, 24, MediaQuery.of(context).padding.bottom + 16),
+          24,
+          16,
+          24,
+          MediaQuery.of(context).padding.bottom + 16,
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF111111),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 20,
               offset: const Offset(0, -8),
-            )
+            ),
           ],
         ),
         child: SizedBox(
@@ -218,14 +248,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5, color: Colors.black),
+                      strokeWidth: 2.5,
+                      color: Colors.black,
+                    ),
                   )
                 : const Text(
                     'حفظ التغييرات',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
           ),
         ),
@@ -237,7 +266,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Text(
       text,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.6),
+        color: Colors.white.withValues(alpha: 0.6),
         fontSize: 12,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.8,
@@ -261,19 +290,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.06),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        fillColor: Colors.white.withValues(alpha: 0.06),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: AppTheme.primary.withOpacity(0.6), width: 1.5),
+          borderSide: BorderSide(
+            color: AppTheme.primary.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
