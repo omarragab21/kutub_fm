@@ -13,6 +13,11 @@ class AppUserModel {
     required this.emailVerified,
     this.createdAt,
     this.updatedAt,
+    this.userType = 'normal_user',
+    this.emailDomain,
+    this.appEmailVerified = false,
+    this.firebaseEmailVerified = false,
+    this.verificationMode = 'firebase_email_verification',
   });
 
   final String uid;
@@ -25,6 +30,11 @@ class AppUserModel {
   final bool emailVerified;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String userType;
+  final String? emailDomain;
+  final bool appEmailVerified;
+  final bool firebaseEmailVerified;
+  final String verificationMode;
 
   AppUserModel copyWith({
     String? uid,
@@ -37,6 +47,11 @@ class AppUserModel {
     bool? emailVerified,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? userType,
+    String? emailDomain,
+    bool? appEmailVerified,
+    bool? firebaseEmailVerified,
+    String? verificationMode,
   }) {
     return AppUserModel(
       uid: uid ?? this.uid,
@@ -49,6 +64,11 @@ class AppUserModel {
       emailVerified: emailVerified ?? this.emailVerified,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      userType: userType ?? this.userType,
+      emailDomain: emailDomain ?? this.emailDomain,
+      appEmailVerified: appEmailVerified ?? this.appEmailVerified,
+      firebaseEmailVerified: firebaseEmailVerified ?? this.firebaseEmailVerified,
+      verificationMode: verificationMode ?? this.verificationMode,
     );
   }
 
@@ -64,6 +84,11 @@ class AppUserModel {
       'emailVerified': emailVerified,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'userType': userType,
+      if (emailDomain != null) 'emailDomain': emailDomain,
+      'appEmailVerified': appEmailVerified,
+      'firebaseEmailVerified': firebaseEmailVerified,
+      'verificationMode': verificationMode,
     };
   }
 
@@ -79,6 +104,11 @@ class AppUserModel {
       emailVerified: map['emailVerified'] ?? false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      userType: map['userType'] ?? 'normal_user',
+      emailDomain: map['emailDomain'],
+      appEmailVerified: map['appEmailVerified'] ?? false,
+      firebaseEmailVerified: map['firebaseEmailVerified'] ?? false,
+      verificationMode: map['verificationMode'] ?? 'firebase_email_verification',
     );
   }
 
@@ -92,6 +122,10 @@ class AppUserModel {
       role: 'user',
       isGuest: user.isAnonymous,
       emailVerified: user.emailVerified,
+      userType: 'normal_user',
+      appEmailVerified: user.emailVerified,
+      firebaseEmailVerified: user.emailVerified,
+      verificationMode: 'firebase_email_verification',
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../data/repositories/profile_repository.dart';
 import '../../domain/entities/user_profile.dart';
@@ -39,9 +40,11 @@ class ProfileViewModel extends ChangeNotifier {
   /// Applies changes optimistically and rolls back on failure.
   Future<void> updateProfile({
     required String name,
+    required String email,
     required String bio,
     required List<String> favoriteCategories,
     String? avatarUrl,
+    File? profileImage,
   }) async {
     if (_profile == null) return;
 
@@ -51,6 +54,7 @@ class ProfileViewModel extends ChangeNotifier {
     // Optimistic update
     _profile = _profile!.copyWith(
       name: name,
+      email: email, // This might revert if verification is sent
       bio: bio,
       favoriteCategories: favoriteCategories,
       avatarUrl: avatarUrl,
@@ -61,23 +65,38 @@ class ProfileViewModel extends ChangeNotifier {
     try {
       final saved = await _repository.updateProfile(
         name: name,
+        email: email,
         bio: bio,
         favoriteCategories: favoriteCategories,
         avatarUrl: avatarUrl,
+        profileImage: profileImage,
       );
       _profile = saved;
       _status = ProfileStatus.loaded;
     } catch (e) {
-      // Rollback
-      _profile = _previousProfile;
-      _errorMessage = 'فشل تحديث الملف الشخصي. الرجاء المحاولة مجدداً.';
-      _status = ProfileStatus.error;
+      if (e.toString().contains('email-verification-sent')) {
+        // Fetch to revert email to old email since it's not verified yet
+        _profile = await _repository.fetchProfile();
+        _errorMessage = 'تم حفظ التغييرات. تم إرسال رابط تأكيد للبريد الجديد، ولن يتغير حتى تقوم بتأكيده.';
+        _status = ProfileStatus.loaded;
+      } else if (e.toString().contains('requires-recent-login')) {
+        _profile = _previousProfile;
+        _errorMessage = 'لتغيير البريد الإلكتروني، يرجى تسجيل الخروج والدخول مجدداً لأسباب أمنية.';
+        _status = ProfileStatus.error;
+      } else {
+        // Rollback
+        _profile = _previousProfile;
+        _errorMessage = 'فشل تحديث الملف الشخصي. الرجاء المحاولة مجدداً.';
+        _status = ProfileStatus.error;
+      }
       notifyListeners();
 
-      // Auto-recover after showing error
-      await Future.delayed(const Duration(seconds: 2));
-      _status = ProfileStatus.loaded;
-      _errorMessage = null;
+      if (_status == ProfileStatus.error) {
+        // Auto-recover after showing error
+        await Future.delayed(const Duration(seconds: 4));
+        _status = ProfileStatus.loaded;
+        _errorMessage = null;
+      }
     }
     notifyListeners();
   }

@@ -1,28 +1,97 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../auth/data/services/firebase_storage_service.dart';
 import '../../domain/entities/user_profile.dart';
 
-/// Repository providing profile data.
-/// In production, replace the mock methods with real API calls.
 class ProfileRepository {
-  // Simulate network delay
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<UserProfile> fetchProfile() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return _mockProfile;
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final docSnap = await _firestore.collection('users').doc(user.uid).get();
+    
+    if (!docSnap.exists) {
+      throw Exception('User profile not found');
+    }
+
+    final data = docSnap.data()!;
+    
+    return UserProfile(
+      id: user.uid,
+      name: data['name'] ?? user.displayName ?? '',
+      email: user.email ?? data['email'] ?? '',
+      avatarUrl: data['photoUrl'] ?? user.photoURL,
+      bio: data['bio'] ?? _mockProfile.bio,
+      favoriteCategories: List<String>.from(data['favoriteCategories'] ?? _mockProfile.favoriteCategories),
+      totalBooksListened: data['totalBooksListened'] ?? _mockProfile.totalBooksListened,
+      totalListeningMinutes: data['totalListeningMinutes'] ?? _mockProfile.totalListeningMinutes,
+      favoritesCount: data['favoritesCount'] ?? _mockProfile.favoritesCount,
+      followersCount: data['followersCount'] ?? _mockProfile.followersCount,
+      followingCount: data['followingCount'] ?? _mockProfile.followingCount,
+      weeklyActivityMinutes: _mockProfile.weeklyActivityMinutes,
+      continueListening: _mockProfile.continueListening,
+    );
   }
 
   Future<UserProfile> updateProfile({
     required String name,
+    required String email,
     required String bio,
     required List<String> favoriteCategories,
     String? avatarUrl,
+    File? profileImage,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    // In production: PUT /user/profile
-    return _mockProfile.copyWith(
-      name: name,
-      bio: bio,
-      favoriteCategories: favoriteCategories,
-      avatarUrl: avatarUrl,
-    );
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    String? finalAvatarUrl = avatarUrl;
+    if (profileImage != null) {
+      final storageService = FirebaseStorageService();
+      finalAvatarUrl = await storageService.uploadProfileImage(
+        imageFile: profileImage,
+        uid: user.uid,
+      );
+    }
+
+    final Map<String, dynamic> updates = {
+      'name': name,
+      'bio': bio,
+      'favoriteCategories': favoriteCategories,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (finalAvatarUrl != null) {
+      updates['photoUrl'] = finalAvatarUrl;
+    }
+
+    bool emailChanged = false;
+    final newEmail = email.trim().toLowerCase();
+    if (newEmail.isNotEmpty && newEmail != user.email?.trim().toLowerCase()) {
+      try {
+        await user.verifyBeforeUpdateEmail(newEmail);
+        emailChanged = true;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          throw Exception('requires-recent-login');
+        } else {
+          throw Exception(e.message ?? 'فشل تحديث البريد الإلكتروني');
+        }
+      }
+    }
+
+    await _firestore.collection('users').doc(user.uid).update(updates);
+    
+    final updatedProfile = await fetchProfile();
+    
+    if (emailChanged) {
+      throw Exception('email-verification-sent');
+    }
+
+    return updatedProfile;
   }
 }
 
@@ -31,11 +100,12 @@ class ProfileRepository {
 final _mockProfile = UserProfile(
   id: 'usr_001',
   name: 'عمر رجب',
-  avatarUrl: null, // Will show initials avatar
+  email: 'omar@example.com',
+  avatarUrl: null,
   bio: 'عاشق للقراءة والاستماع • محب للتاريخ والفلسفة',
   favoriteCategories: ['تاريخ', 'فلسفة', 'رواية', 'علوم', 'تنمية'],
   totalBooksListened: 24,
-  totalListeningMinutes: 9360, // 156 hours
+  totalListeningMinutes: 9360,
   favoritesCount: 12,
   followersCount: 340,
   followingCount: 87,

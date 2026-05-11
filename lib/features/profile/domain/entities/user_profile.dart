@@ -2,6 +2,7 @@
 class UserProfile {
   final String id;
   final String name;
+  final String email;
   final String? avatarUrl;
   final String? bio;
   final List<String> favoriteCategories;
@@ -16,6 +17,7 @@ class UserProfile {
   const UserProfile({
     required this.id,
     required this.name,
+    required this.email,
     this.avatarUrl,
     this.bio,
     this.favoriteCategories = const [],
@@ -35,6 +37,7 @@ class UserProfile {
 
   UserProfile copyWith({
     String? name,
+    String? email,
     String? avatarUrl,
     String? bio,
     List<String>? favoriteCategories,
@@ -42,6 +45,7 @@ class UserProfile {
     return UserProfile(
       id: id,
       name: name ?? this.name,
+      email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       bio: bio ?? this.bio,
       favoriteCategories: favoriteCategories ?? this.favoriteCategories,

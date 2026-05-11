@@ -7,6 +7,7 @@ import '../../../../core/routes/app_routes.dart';
 import '../../../../core/validators/auth_validators.dart';
 import '../../../../core/dialogs/loading_dialog.dart';
 import '../providers/auth_provider.dart';
+import '../../utils/auth_helpers.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -27,6 +28,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _autovalidate = false;
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
+  String _userTypeLabel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onEmailChanged);
+  }
+
+  void _onEmailChanged() {
+    final email = _emailController.text.trim().toLowerCase();
+    String label = '';
+    if (email.isNotEmpty && email.contains('@')) {
+      final userType = detectUserTypeFromEmail(email);
+      if (userType == 'student') {
+        label = 'نوع الحساب: طالب';
+      } else if (userType == 'employee') {
+        label = 'نوع الحساب: موظف';
+      } else {
+        label = 'نوع الحساب: مستخدم عادي';
+      }
+    }
+    
+    if (label != _userTypeLabel) {
+      setState(() {
+        _userTypeLabel = label;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -286,6 +315,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         validator: AuthValidators.validateEmail,
                       ),
+                      if (_userTypeLabel.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _userTypeLabel,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.start,
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _passwordController,

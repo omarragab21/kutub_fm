@@ -10,6 +10,11 @@ class UserFirestoreService {
     String? photoUrl,
     required String provider,
     required bool emailVerified,
+    String userType = 'normal_user',
+    String? emailDomain,
+    bool appEmailVerified = false,
+    bool firebaseEmailVerified = false,
+    String verificationMode = 'firebase_email_verification',
   }) async {
     try {
       final docRef = _firestore.collection('users').doc(uid);
@@ -23,6 +28,11 @@ class UserFirestoreService {
         'role': 'user',
         'isGuest': false,
         'emailVerified': emailVerified,
+        'userType': userType,
+        if (emailDomain != null) 'emailDomain': emailDomain,
+        'appEmailVerified': appEmailVerified,
+        'firebaseEmailVerified': firebaseEmailVerified,
+        'verificationMode': verificationMode,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 

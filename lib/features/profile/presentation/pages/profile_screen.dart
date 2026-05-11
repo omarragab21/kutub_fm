@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../viewmodels/profile_viewmodel.dart';
+import '../../domain/entities/user_profile.dart';
 import '../widgets/profile_widgets.dart';
 import 'edit_profile_screen.dart';
 import 'package:kutub_fm/features/subscription/presentation/screens/subscription_screen.dart';
@@ -159,7 +160,7 @@ class _ProfileView extends StatelessWidget {
                 // ── Edit Profile Button ──────────────────────────────
                 if (!authProvider.isGuest)
                   Center(
-                    child: _EditButton(onTap: () => _openEditProfile(context)),
+                    child: _EditButton(onTap: () => _openEditProfile(context, profile)),
                   ),
                 const SizedBox(height: 28),
 
@@ -227,10 +228,8 @@ class _ProfileView extends StatelessWidget {
     );
   }
 
-  void _openEditProfile(BuildContext context) {
+  void _openEditProfile(BuildContext context, UserProfile profile) {
     final viewModel = context.read<ProfileViewModel>();
-    final profile = viewModel.profile;
-    if (profile == null) return;
 
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -247,12 +246,14 @@ class _ProfileView extends StatelessWidget {
                 ),
             child: EditProfileScreen(
               profile: profile,
-              onSave: (name, bio, categories) async {
+              onSave: (name, email, bio, categories, newProfileImage) async {
                 await Future.wait([
                   viewModel.updateProfile(
                     name: name,
+                    email: email,
                     bio: bio,
                     favoriteCategories: categories,
+                    profileImage: newProfileImage,
                   ),
                   context.read<AuthProvider>().updateProfileName(name),
                 ]);

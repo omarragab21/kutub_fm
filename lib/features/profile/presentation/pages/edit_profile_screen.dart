@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/user_profile.dart';
 
@@ -8,8 +10,10 @@ class EditProfileScreen extends StatefulWidget {
   final UserProfile profile;
   final FutureOr<void> Function(
     String name,
+    String email,
     String bio,
     List<String> categories,
+    File? newProfileImage,
   )
   onSave;
 
@@ -26,8 +30,10 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  late TextEditingController _emailController;
   late TextEditingController _bioController;
   late List<String> _selectedCategories;
+  File? _newProfileImage;
   bool _isSaving = false;
 
   static const _allCategories = [
@@ -49,6 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.profile.name);
+    _emailController = TextEditingController(text: widget.profile.email);
     _bioController = TextEditingController(text: widget.profile.bio ?? '');
     _selectedCategories = List.from(widget.profile.favoriteCategories);
   }
@@ -56,8 +63,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
     _bioController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _newProfileImage = File(pickedFile.path);
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -66,8 +87,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await Future.delayed(const Duration(milliseconds: 200));
     await widget.onSave(
       _nameController.text.trim(),
+      _emailController.text.trim(),
       _bioController.text.trim(),
       _selectedCategories,
+      _newProfileImage,
     );
     if (mounted) Navigator.of(context).pop();
   }
@@ -102,31 +125,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 52,
-                    backgroundColor: AppTheme.surfaceContainerHighest,
-                    child: Text(
-                      _initials(_nameController.text),
-                      style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 52,
+                      backgroundColor: AppTheme.surfaceContainerHighest,
+                      backgroundImage: _newProfileImage != null
+                          ? FileImage(_newProfileImage!) as ImageProvider
+                          : (widget.profile.avatarUrl != null && widget.profile.avatarUrl!.isNotEmpty)
+                              ? NetworkImage(widget.profile.avatarUrl!)
+                              : null,
+                      child: (_newProfileImage == null && (widget.profile.avatarUrl == null || widget.profile.avatarUrl!.isEmpty))
+                          ? Text(
+                              _initials(_nameController.text),
+                              style: const TextStyle(
+                                color: AppTheme.primary,
+                                fontSize: 34,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.black,
-                        size: 16,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.black,
+                          size: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -147,6 +183,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 return null;
               },
               onChanged: (_) => setState(() {}), // refresh initials
+            ),
+            const SizedBox(height: 20),
+
+            // Email field
+            _buildLabel('البريد الإلكتروني'),
+            const SizedBox(height: 8),
+            _buildTextField(
+              controller: _emailController,
+              hint: 'اكتب بريدك الإلكتروني',
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'البريد الإلكتروني مطلوب';
+                if (!v.contains('@')) return 'بريد إلكتروني غير صالح';
+                return null;
+              },
             ),
             const SizedBox(height: 20),
 

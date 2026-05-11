@@ -8,6 +8,7 @@ import '../../data/models/app_user_model.dart';
 import '../../data/services/firebase_auth_service.dart';
 import '../../data/services/firebase_storage_service.dart';
 import '../../data/services/user_firestore_service.dart';
+import '../../utils/auth_helpers.dart';
 
 enum AuthStatus {
   initial,
@@ -91,6 +92,10 @@ class AuthProvider extends ChangeNotifier {
         );
       }
 
+      final emailDomain = extractEmailDomain(email);
+      final userType = detectUserTypeFromEmail(email);
+      final shouldVerifyEmail = requiresEmailVerification(email);
+
       _pendingRegistration = _PendingRegistration(
         uid: firebaseUser.uid,
         name: name.trim(),
@@ -99,10 +104,62 @@ class AuthProvider extends ChangeNotifier {
       );
 
       _user = firebaseUser;
-      _appUser = AppUserModel.fromFirebaseUser(firebaseUser);
-      await _service.sendEmailVerification();
+      
+      if (shouldVerifyEmail) {
+        _appUser = AppUserModel.fromFirebaseUser(firebaseUser).copyWith(
+          userType: userType,
+          emailDomain: emailDomain,
+          appEmailVerified: false,
+          firebaseEmailVerified: false,
+          verificationMode: 'firebase_email_verification',
+        );
+        await _service.sendEmailVerification();
+        _status = AuthStatus.emailNotVerified;
+      } else {
+        String? photoUrl = firebaseUser.photoURL;
 
-      _status = AuthStatus.emailNotVerified;
+        if (profileImage != null) {
+          photoUrl = await _storage.uploadProfileImage(
+            imageFile: profileImage,
+            uid: firebaseUser.uid,
+          );
+        }
+
+        await _service.updateUserProfile(name: name, photoUrl: photoUrl);
+        await _firestore.createUserDocument(
+          uid: firebaseUser.uid,
+          name: name,
+          email: email,
+          photoUrl: photoUrl,
+          provider: 'email',
+          emailVerified: true,
+          userType: userType,
+          emailDomain: emailDomain,
+          appEmailVerified: true,
+          firebaseEmailVerified: firebaseUser.emailVerified,
+          verificationMode: 'domain_skip_temporary',
+        );
+
+        await _service.reloadUser();
+        _user = _service.currentUser;
+        _appUser = AppUserModel(
+          uid: firebaseUser.uid,
+          name: name,
+          email: email,
+          photoUrl: photoUrl,
+          provider: 'email',
+          role: 'user',
+          isGuest: false,
+          emailVerified: true,
+          userType: userType,
+          emailDomain: emailDomain,
+          appEmailVerified: true,
+          firebaseEmailVerified: firebaseUser.emailVerified,
+          verificationMode: 'domain_skip_temporary',
+        );
+        _pendingRegistration = null;
+        _status = AuthStatus.authenticated;
+      }
     } on FirebaseAuthException catch (error) {
       _setError(_mapAuthError(error));
     } on FirebaseException catch (error) {
@@ -201,6 +258,11 @@ class AuthProvider extends ChangeNotifier {
         photoUrl: photoUrl,
         provider: 'email',
         emailVerified: true,
+        userType: 'normal_user',
+        emailDomain: extractEmailDomain(email),
+        appEmailVerified: true,
+        firebaseEmailVerified: true,
+        verificationMode: 'firebase_email_verification',
       );
 
       await _service.reloadUser();
@@ -214,6 +276,11 @@ class AuthProvider extends ChangeNotifier {
         role: 'user',
         isGuest: false,
         emailVerified: true,
+        userType: 'normal_user',
+        emailDomain: extractEmailDomain(email),
+        appEmailVerified: true,
+        firebaseEmailVerified: true,
+        verificationMode: 'firebase_email_verification',
       );
       _pendingRegistration = null;
       _status = AuthStatus.authenticated;
@@ -325,7 +392,16 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _resolveStatus(User? firebaseUser) {
     if (firebaseUser == null) return AuthStatus.unauthenticated;
     if (firebaseUser.isAnonymous) return AuthStatus.guest;
-    if (!firebaseUser.emailVerified) return AuthStatus.emailNotVerified;
+    
+    if (firebaseUser.email != null) {
+      final userType = detectUserTypeFromEmail(firebaseUser.email!);
+      if (userType == 'normal_user' && !firebaseUser.emailVerified) {
+        return AuthStatus.emailNotVerified;
+      }
+    } else if (!firebaseUser.emailVerified) {
+      return AuthStatus.emailNotVerified;
+    }
+    
     return AuthStatus.authenticated;
   }
 
