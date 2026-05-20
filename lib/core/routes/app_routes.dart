@@ -4,6 +4,7 @@ import '../../features/onboarding/presentation/pages/onboarding_discover_screen.
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/email_verification_screen.dart';
+import '../../features/auth/presentation/facebook_login_screen.dart';
 import '../../features/auth/presentation/pages/category_selection_screen.dart';
 import '../../features/home/presentation/pages/main_screen.dart';
 import '../../features/book_details/presentation/pages/book_details_page.dart';
@@ -24,6 +25,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
+  static const String facebookLogin = '/facebook-login';
   static const String register = '/register';
   static const String emailVerification = '/email-verification';
   static const String categorySelection = '/category_selection';
@@ -56,6 +58,11 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => const LoginScreen(),
+        );
+      case facebookLogin:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const FacebookLoginScreen(),
         );
       case register:
         return MaterialPageRoute(

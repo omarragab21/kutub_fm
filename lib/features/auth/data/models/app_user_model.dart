@@ -18,6 +18,8 @@ class AppUserModel {
     this.appEmailVerified = false,
     this.firebaseEmailVerified = false,
     this.verificationMode = 'firebase_email_verification',
+    this.categorySelectionCompleted = false,
+    this.categorySelectionSkipped = false,
   });
 
   final String uid;
@@ -35,6 +37,8 @@ class AppUserModel {
   final bool appEmailVerified;
   final bool firebaseEmailVerified;
   final String verificationMode;
+  final bool categorySelectionCompleted;
+  final bool categorySelectionSkipped;
 
   AppUserModel copyWith({
     String? uid,
@@ -52,6 +56,8 @@ class AppUserModel {
     bool? appEmailVerified,
     bool? firebaseEmailVerified,
     String? verificationMode,
+    bool? categorySelectionCompleted,
+    bool? categorySelectionSkipped,
   }) {
     return AppUserModel(
       uid: uid ?? this.uid,
@@ -69,6 +75,8 @@ class AppUserModel {
       appEmailVerified: appEmailVerified ?? this.appEmailVerified,
       firebaseEmailVerified: firebaseEmailVerified ?? this.firebaseEmailVerified,
       verificationMode: verificationMode ?? this.verificationMode,
+      categorySelectionCompleted: categorySelectionCompleted ?? this.categorySelectionCompleted,
+      categorySelectionSkipped: categorySelectionSkipped ?? this.categorySelectionSkipped,
     );
   }
 
@@ -89,6 +97,8 @@ class AppUserModel {
       'appEmailVerified': appEmailVerified,
       'firebaseEmailVerified': firebaseEmailVerified,
       'verificationMode': verificationMode,
+      'categorySelectionCompleted': categorySelectionCompleted,
+      'categorySelectionSkipped': categorySelectionSkipped,
     };
   }
 
@@ -109,6 +119,8 @@ class AppUserModel {
       appEmailVerified: map['appEmailVerified'] ?? false,
       firebaseEmailVerified: map['firebaseEmailVerified'] ?? false,
       verificationMode: map['verificationMode'] ?? 'firebase_email_verification',
+      categorySelectionCompleted: map['categorySelectionCompleted'] ?? false,
+      categorySelectionSkipped: map['categorySelectionSkipped'] ?? false,
     );
   }
 
@@ -126,6 +138,8 @@ class AppUserModel {
       appEmailVerified: user.emailVerified,
       firebaseEmailVerified: user.emailVerified,
       verificationMode: 'firebase_email_verification',
+      categorySelectionCompleted: false,
+      categorySelectionSkipped: false,
     );
   }
 }

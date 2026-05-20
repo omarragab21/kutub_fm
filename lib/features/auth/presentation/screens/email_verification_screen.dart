@@ -15,7 +15,10 @@ class EmailVerificationScreen extends StatelessWidget {
 
     if (!context.mounted) return;
     if (authProvider.status == AuthStatus.authenticated) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+      final nextRoute = authProvider.isCategorySelectionCompleted
+          ? AppRoutes.home
+          : AppRoutes.categorySelection;
+      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
       return;
     }
 

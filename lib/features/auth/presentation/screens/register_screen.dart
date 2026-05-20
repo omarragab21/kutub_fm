@@ -163,7 +163,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (authProvider.status == AuthStatus.emailNotVerified) {
       Navigator.pushReplacementNamed(context, AppRoutes.emailVerification);
     } else if (authProvider.status == AuthStatus.authenticated) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+      final nextRoute = authProvider.isCategorySelectionCompleted
+          ? AppRoutes.home
+          : AppRoutes.categorySelection;
+      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
     }
   }
 
@@ -202,7 +205,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (authProvider.status == AuthStatus.emailNotVerified) {
       Navigator.pushReplacementNamed(context, AppRoutes.emailVerification);
     } else if (authProvider.status == AuthStatus.authenticated) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+      final nextRoute = authProvider.isCategorySelectionCompleted
+          ? AppRoutes.home
+          : AppRoutes.categorySelection;
+      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
     }
   }
 

@@ -18,7 +18,7 @@ class UserFirestoreService {
   }) async {
     try {
       final docRef = _firestore.collection('users').doc(uid);
-      
+
       final Map<String, dynamic> data = {
         'uid': uid,
         'name': name,
@@ -39,7 +39,7 @@ class UserFirestoreService {
       // We use SetOptions(merge: true) to avoid overwriting existing fields
       // like createdAt if the document already exists.
       // But we also need to ensure createdAt is set if it's a new document.
-      
+
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
         data['createdAt'] = FieldValue.serverTimestamp();
@@ -50,6 +50,14 @@ class UserFirestoreService {
       throw Exception('فشل حفظ بيانات المستخدم: ${e.message}');
     } catch (e) {
       throw Exception('حدث خطأ غير متوقع أثناء حفظ بيانات المستخدم.');
+    }
+  }
+  Future<Map<String, dynamic>?> getUserDocument(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      return doc.data();
+    } catch (e) {
+      return null;
     }
   }
 }

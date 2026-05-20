@@ -50,9 +50,16 @@ class HomeScreen extends StatelessWidget {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               // Categories Section
-              _buildSectionHeader(theme, 'تصنيفاتنا', 'استعراض'),
+              _buildSectionHeader(
+                theme,
+                'اهتماماتك',
+                'تعديل',
+                onActionPressed: () {
+                  Navigator.pushNamed(context, AppRoutes.categorySelection);
+                },
+              ),
               const SizedBox(height: 16),
-              _buildCategoryList(viewModel.categories, theme),
+              _buildCategoryList(viewModel.categories, theme, context),
               const SizedBox(height: 40),
 
               // Quick Access Bento Grid
@@ -119,7 +126,12 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(ThemeData theme, String title, String actionText) {
+  Widget _buildSectionHeader(
+    ThemeData theme,
+    String title,
+    String actionText, {
+    VoidCallback? onActionPressed,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -131,7 +143,7 @@ class HomeScreen extends StatelessWidget {
         ),
         if (actionText.isNotEmpty)
           TextButton(
-            onPressed: () {},
+            onPressed: onActionPressed ?? () {},
             child: Text(
               actionText,
               style: TextStyle(color: theme.colorScheme.primary, fontSize: 14),
@@ -141,7 +153,43 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryList(List<HomeCategory> categories, ThemeData theme) {
+  Widget _buildCategoryList(
+    List<HomeCategory> categories,
+    ThemeData theme,
+    BuildContext context,
+  ) {
+    if (categories.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2C2C2B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.tune, color: theme.colorScheme.primary, size: 30),
+            const SizedBox(height: 10),
+            Text(
+              'اختياراتك هتظهر هنا بعد تحديد اهتماماتك',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.categorySelection);
+              },
+              child: const Text('اختيار الاهتمامات'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       height: 110,
       child: ListView.separated(
@@ -160,37 +208,45 @@ class HomeScreen extends StatelessWidget {
             },
             child: Column(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF2C2C2B),
-                    border: Border.all(
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.3,
+                SizedBox(
+                  width: 88,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF2C2C2B),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: _buildCategoryIcon(cat.icon, theme),
+                        ),
                       ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                      const SizedBox(height: 8),
+                      Text(
+                        cat.title,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Icon(
-                      _getIconData(cat.icon),
-                      color: theme.colorScheme.primary,
-                      size: 32,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  cat.title,
-                  style: theme.textTheme.labelSmall?.copyWith(fontSize: 12),
                 ),
               ],
             ),
@@ -198,6 +254,32 @@ class HomeScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Widget _buildCategoryIcon(String icon, ThemeData theme) {
+    if (_isNetworkUrl(icon)) {
+      return Padding(
+        padding: const EdgeInsets.all(18),
+        child: Image.network(
+          icon,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Icon(
+              Icons.category,
+              color: theme.colorScheme.primary,
+              size: 32,
+            );
+          },
+        ),
+      );
+    }
+
+    return Icon(_getIconData(icon), color: theme.colorScheme.primary, size: 32);
+  }
+
+  bool _isNetworkUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
   IconData _getIconData(String name) {
@@ -214,6 +296,10 @@ class HomeScreen extends StatelessWidget {
         return Icons.mosque;
       case 'science':
         return Icons.science;
+      case 'child_care':
+        return Icons.child_care;
+      case 'memory':
+        return Icons.memory;
       default:
         return Icons.category;
     }
@@ -294,7 +380,8 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.podcastList),
+                        onTap: () =>
+                            Navigator.pushNamed(context, AppRoutes.podcastList),
                         child: _buildSmallBentoItem(
                           theme,
                           'بودكاست',
@@ -311,8 +398,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 16),
         // Majlis Wide Card
         GestureDetector(
-          onTap: () =>
-              context.read<AppNavigationState>().setSelectedIndex(1),
+          onTap: () => context.read<AppNavigationState>().setSelectedIndex(1),
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(

@@ -217,8 +217,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateForStatus(AuthStatus status) {
-    if (status == AuthStatus.authenticated || status == AuthStatus.guest) {
+    if (status == AuthStatus.guest) {
       Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+    } else if (status == AuthStatus.authenticated) {
+      final authProvider = context.read<AuthProvider>();
+      final nextRoute = authProvider.isCategorySelectionCompleted
+          ? AppRoutes.home
+          : AppRoutes.categorySelection;
+      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
     } else if (status == AuthStatus.emailNotVerified) {
       Navigator.pushReplacementNamed(context, AppRoutes.emailVerification);
     }

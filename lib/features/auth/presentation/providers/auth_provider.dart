@@ -40,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
       _status == AuthStatus.authenticated || _status == AuthStatus.guest;
   bool get isGuest => _user?.isAnonymous ?? false;
   bool get isEmailVerified => _user?.emailVerified ?? false;
+  bool get isCategorySelectionCompleted => _appUser?.categorySelectionCompleted ?? false;
 
   FirebaseAuthService get _service => _authService ??= FirebaseAuthService();
 
@@ -267,21 +268,16 @@ class AuthProvider extends ChangeNotifier {
 
       await _service.reloadUser();
       _user = _service.currentUser;
-      _appUser = AppUserModel(
-        uid: firebaseUser.uid,
-        name: name,
-        email: email,
-        photoUrl: photoUrl,
-        provider: 'email',
-        role: 'user',
-        isGuest: false,
-        emailVerified: true,
-        userType: 'normal_user',
-        emailDomain: extractEmailDomain(email),
-        appEmailVerified: true,
-        firebaseEmailVerified: true,
-        verificationMode: 'firebase_email_verification',
-      );
+      
+      // Initialize with default and then update from Firestore if exists
+      _appUser = AppUserModel.fromFirebaseUser(_user!);
+
+      // Fetch additional data from Firestore
+      final userData = await _firestore.getUserDocument(firebaseUser.uid);
+      if (userData != null) {
+        _appUser = AppUserModel.fromMap(userData, firebaseUser.uid);
+      }
+
       _pendingRegistration = null;
       _status = AuthStatus.authenticated;
     } on FirebaseAuthException catch (error) {
@@ -382,10 +378,24 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshUser() async {
+    await _refreshCurrentUser();
+    notifyListeners();
+  }
+
   Future<void> _refreshCurrentUser() async {
     await _service.reloadUser();
     _user = _service.currentUser;
-    _appUser = _user == null ? null : AppUserModel.fromFirebaseUser(_user!);
+    if (_user == null) {
+      _appUser = null;
+    } else {
+      final userData = await _firestore.getUserDocument(_user!.uid);
+      if (userData != null) {
+        _appUser = AppUserModel.fromMap(userData, _user!.uid);
+      } else {
+        _appUser = AppUserModel.fromFirebaseUser(_user!);
+      }
+    }
     _status = _resolveStatus(_user);
   }
 

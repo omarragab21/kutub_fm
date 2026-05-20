@@ -34,7 +34,11 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       final route = switch (status) {
-        AuthStatus.guest || AuthStatus.authenticated => AppRoutes.home,
+        AuthStatus.guest => AppRoutes.home,
+        AuthStatus.authenticated =>
+          context.read<AuthProvider>().isCategorySelectionCompleted
+              ? AppRoutes.home
+              : AppRoutes.categorySelection,
         AuthStatus.emailNotVerified => AppRoutes.emailVerification,
         AuthStatus.unauthenticated => AppRoutes.onboarding,
         AuthStatus.initial ||
