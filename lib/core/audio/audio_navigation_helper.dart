@@ -41,13 +41,17 @@ class AudioNavigationHelper {
         );
       case AudioMode.readingAudio:
         final bookId = audioProvider.currentReadingBookId;
+        final chapterId = audioProvider.currentReadingChapterId;
         final bookTitle = audioProvider.currentReadingBookTitle;
+        final audioUrl = audioProvider.currentReadingBookAudioUrl;
         if (bookId == null || bookTitle == null) return null;
         return _AudioNavigationDestination(
           routeName: AppRoutes.bookReader,
           arguments: BookReaderScreenArgs(
             pdfAssetPath: bookId,
             bookTitle: bookTitle,
+            audioUrl: audioUrl,
+            chapterId: chapterId,
           ),
         );
       case AudioMode.podcast:
@@ -88,7 +92,8 @@ class _AudioNavigationDestination {
     if (targetArguments is BookReaderScreenArgs &&
         currentArguments is BookReaderScreenArgs) {
       return targetArguments.pdfAssetPath == currentArguments.pdfAssetPath &&
-          targetArguments.bookTitle == currentArguments.bookTitle;
+          targetArguments.bookTitle == currentArguments.bookTitle &&
+          targetArguments.chapterId == currentArguments.chapterId;
     }
 
     if (routeName == AppRoutes.podcastDetail &&

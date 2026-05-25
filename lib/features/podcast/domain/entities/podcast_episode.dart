@@ -7,6 +7,7 @@ class PodcastEpisode {
   final String title;
   final String description;
   final String audioUrl;
+  final String? youtubeUrl;
   final String imageUrl;
   final String duration;
   final String category;
@@ -18,6 +19,7 @@ class PodcastEpisode {
     required this.title,
     required this.description,
     required this.audioUrl,
+    this.youtubeUrl,
     required this.imageUrl,
     required this.duration,
     required this.category,
@@ -30,6 +32,7 @@ class PodcastEpisode {
     String? title,
     String? description,
     String? audioUrl,
+    String? youtubeUrl,
     String? imageUrl,
     String? duration,
     String? category,
@@ -41,6 +44,7 @@ class PodcastEpisode {
       title: title ?? this.title,
       description: description ?? this.description,
       audioUrl: audioUrl ?? this.audioUrl,
+      youtubeUrl: youtubeUrl ?? this.youtubeUrl,
       imageUrl: imageUrl ?? this.imageUrl,
       duration: duration ?? this.duration,
       category: category ?? this.category,
@@ -49,3 +53,4 @@ class PodcastEpisode {
     );
   }
 }
+

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,6 +33,10 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   _PendingRegistration? _pendingRegistration;
 
+  String? _phoneVerificationId;
+  int? _phoneResendToken;
+  String? _pendingPhoneNumber;
+
   AuthStatus get status => _status;
   User? get user => _user;
   AppUserModel? get appUser => _appUser;
@@ -41,19 +46,55 @@ class AuthProvider extends ChangeNotifier {
   bool get isGuest => _user?.isAnonymous ?? false;
   bool get isEmailVerified => _user?.emailVerified ?? false;
   bool get isCategorySelectionCompleted => _appUser?.categorySelectionCompleted ?? false;
+  String? get phoneVerificationId => _phoneVerificationId;
+  int? get phoneResendToken => _phoneResendToken;
+  String? get pendingPhoneNumber => _pendingPhoneNumber;
+  bool get hasPhoneVerificationId => _phoneVerificationId != null;
 
   FirebaseAuthService get _service => _authService ??= FirebaseAuthService();
 
   void listenToAuthChanges() {
     _authSubscription ??= _service.authStateChanges.listen(
-      (firebaseUser) {
+      (firebaseUser) async {
         _user = firebaseUser;
-        _appUser = firebaseUser == null
-            ? null
-            : AppUserModel.fromFirebaseUser(firebaseUser);
-        _errorMessage = null;
-        _status = _resolveStatus(firebaseUser);
-        notifyListeners();
+        if (firebaseUser == null) {
+          _appUser = null;
+          _errorMessage = null;
+          _status = AuthStatus.unauthenticated;
+          notifyListeners();
+        } else {
+          if (firebaseUser.isAnonymous) {
+            _appUser = AppUserModel.fromFirebaseUser(firebaseUser);
+            _errorMessage = null;
+            _status = AuthStatus.guest;
+            notifyListeners();
+          } else {
+            // First check if email needs verification
+            final userType = detectUserTypeFromEmail(firebaseUser.email ?? '');
+            if (userType == 'normal_user' && !firebaseUser.emailVerified) {
+              _appUser = AppUserModel.fromFirebaseUser(firebaseUser);
+              _errorMessage = null;
+              _status = AuthStatus.emailNotVerified;
+              notifyListeners();
+              return;
+            }
+
+            try {
+              final userData = await _firestore.getUserDocument(firebaseUser.uid);
+              if (userData != null) {
+                _appUser = AppUserModel.fromMap(userData, firebaseUser.uid);
+              } else {
+                _appUser = AppUserModel.fromFirebaseUser(firebaseUser);
+              }
+            } catch (e) {
+              log('Error fetching user document in auth changes: $e');
+              _appUser = AppUserModel.fromFirebaseUser(firebaseUser);
+            }
+            _errorMessage = null;
+            _status = AuthStatus.authenticated;
+            notifyListeners();
+          }
+        }
       },
       onError: (error) {
         _setError(_mapUnknownAuthError(error));
@@ -200,7 +241,21 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
       _user = credential.user ?? _service.currentUser;
-      _status = _resolveStatus(_user);
+      if (_user != null) {
+        await _firestore.createUserDocument(
+          uid: _user!.uid,
+          name: _user!.displayName ?? 'مستخدم كتب FM',
+          email: _user!.email ?? '',
+          photoUrl: _user!.photoURL,
+          provider: 'google',
+          emailVerified: true,
+          userType: 'normal_user',
+          emailDomain: _user!.email != null ? extractEmailDomain(_user!.email!) : null,
+          appEmailVerified: true,
+          firebaseEmailVerified: true,
+          verificationMode: 'google_sign_in',
+        );
+      }
     });
   }
 
@@ -329,6 +384,207 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> sendPhoneOtp(String phoneNumber) async {
+    final cleanedPhone = phoneNumber.replaceAll(' ', '').trim();
+    if (cleanedPhone.isEmpty) {
+      _setError('برجاء إدخال رقم الهاتف');
+      return;
+    }
+    if (!cleanedPhone.startsWith('+')) {
+      _setError('يجب أن يبدأ رقم الهاتف بـ + وكود الدولة (مثال: +201012345678)');
+      return;
+    }
+    if (cleanedPhone.length < 10) {
+      _setError('رقم الهاتف قصير جداً، يجب أن يتكون من 10 أرقام على الأقل');
+      return;
+    }
+
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _service.verifyPhoneNumber(
+        phoneNumber: cleanedPhone,
+        verificationCompleted: (credential) async {
+          await _handlePhoneAutoVerification(credential);
+        },
+        verificationFailed: (error) {
+          log('PhoneLoginScreen: Verification failed - ${error.message}');
+          _setError(_mapAuthError(error));
+        },
+        codeSent: (verificationId, resendToken) {
+          _phoneVerificationId = verificationId;
+          _phoneResendToken = resendToken;
+          _pendingPhoneNumber = cleanedPhone;
+          _status = AuthStatus.unauthenticated;
+          _errorMessage = null;
+          notifyListeners();
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          _phoneVerificationId = verificationId;
+        },
+        forceResendingToken: null,
+      );
+    } on FirebaseAuthException catch (error) {
+      _setError(_mapAuthError(error));
+    } on FirebaseException catch (error) {
+      _setError(_mapFirebaseError(error));
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> resendPhoneOtp() async {
+    if (_pendingPhoneNumber == null) {
+      _setError('لا يوجد رقم هاتف قيد التحقق');
+      return;
+    }
+
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _service.verifyPhoneNumber(
+        phoneNumber: _pendingPhoneNumber!,
+        verificationCompleted: (credential) async {
+          await _handlePhoneAutoVerification(credential);
+        },
+        verificationFailed: (error) {
+          _setError(_mapAuthError(error));
+        },
+        codeSent: (verificationId, resendToken) {
+          _phoneVerificationId = verificationId;
+          _phoneResendToken = resendToken;
+          _status = AuthStatus.unauthenticated;
+          _errorMessage = null;
+          notifyListeners();
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          _phoneVerificationId = verificationId;
+        },
+        forceResendingToken: _phoneResendToken,
+      );
+    } on FirebaseAuthException catch (error) {
+      _setError(_mapAuthError(error));
+    } on FirebaseException catch (error) {
+      _setError(_mapFirebaseError(error));
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> verifyPhoneOtp(String smsCode) async {
+    final cleanCode = smsCode.trim();
+    if (_phoneVerificationId == null) {
+      _setError('انتهت صلاحية الجلسة، يرجى طلب رمز جديد');
+      return;
+    }
+    if (cleanCode.length != 6) {
+      _setError('كود التحقق يجب أن يتكون من 6 أرقام');
+      return;
+    }
+
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final credential = await _service.signInWithPhoneOtp(
+        verificationId: _phoneVerificationId!,
+        smsCode: cleanCode,
+      );
+
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        throw FirebaseAuthException(
+          code: 'internal-error',
+          message: 'فشل تسجيل الدخول برقم الهاتف',
+        );
+      }
+
+      _user = firebaseUser;
+
+      await _firestore.createUserDocument(
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName ?? 'مستخدم كتب FM',
+        email: firebaseUser.email ?? '',
+        photoUrl: firebaseUser.photoURL,
+        provider: 'phone',
+        emailVerified: true,
+        userType: 'normal_user',
+        emailDomain: null,
+        appEmailVerified: true,
+        firebaseEmailVerified: true,
+        verificationMode: 'phone_otp',
+        phoneNumber: firebaseUser.phoneNumber ?? _pendingPhoneNumber,
+      );
+
+      await _refreshCurrentUser();
+      _status = AuthStatus.authenticated;
+      clearPhoneAuthState();
+    } on FirebaseAuthException catch (error) {
+      _setError(_mapAuthError(error));
+    } on FirebaseException catch (error) {
+      _setError(_mapFirebaseError(error));
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+    }
+    notifyListeners();
+  }
+
+  Future<void> _handlePhoneAutoVerification(PhoneAuthCredential credential) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final userCredential = await _service.signInWithPhoneCredential(credential);
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        throw FirebaseAuthException(
+          code: 'internal-error',
+          message: 'فشل تسجيل الدخول التلقائي',
+        );
+      }
+
+      _user = firebaseUser;
+
+      await _firestore.createUserDocument(
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName ?? 'مستخدم كتب FM',
+        email: firebaseUser.email ?? '',
+        photoUrl: firebaseUser.photoURL,
+        provider: 'phone',
+        emailVerified: true,
+        userType: 'normal_user',
+        emailDomain: null,
+        appEmailVerified: true,
+        firebaseEmailVerified: true,
+        verificationMode: 'phone_otp',
+        phoneNumber: firebaseUser.phoneNumber ?? _pendingPhoneNumber,
+      );
+
+      await _refreshCurrentUser();
+      _status = AuthStatus.authenticated;
+      clearPhoneAuthState();
+    } on FirebaseAuthException catch (error) {
+      _setError(_mapAuthError(error));
+    } on FirebaseException catch (error) {
+      _setError(_mapFirebaseError(error));
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+    }
+    notifyListeners();
+  }
+
+  void clearPhoneAuthState() {
+    _phoneVerificationId = null;
+    _phoneResendToken = null;
+    _pendingPhoneNumber = null;
+  }
+
   Future<void> _runAuthAction(Future<void> Function() action) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
@@ -337,8 +593,28 @@ class AuthProvider extends ChangeNotifier {
     try {
       await action();
       _user = _service.currentUser;
-      _appUser = _user == null ? null : AppUserModel.fromFirebaseUser(_user!);
-      _status = _resolveStatus(_user);
+      if (_user == null) {
+        _appUser = null;
+        _status = AuthStatus.unauthenticated;
+      } else if (_user!.isAnonymous) {
+        _appUser = AppUserModel.fromFirebaseUser(_user!);
+        _status = AuthStatus.guest;
+      } else {
+        // First check if email needs verification
+        final userType = detectUserTypeFromEmail(_user!.email ?? '');
+        if (userType == 'normal_user' && !_user!.emailVerified) {
+          _appUser = AppUserModel.fromFirebaseUser(_user!);
+          _status = AuthStatus.emailNotVerified;
+        } else {
+          final userData = await _firestore.getUserDocument(_user!.uid);
+          if (userData != null) {
+            _appUser = AppUserModel.fromMap(userData, _user!.uid);
+          } else {
+            _appUser = AppUserModel.fromFirebaseUser(_user!);
+          }
+          _status = _resolveStatus(_user);
+        }
+      }
     } on FirebaseAuthException catch (error) {
       _setError(_mapAuthError(error));
       return;
@@ -402,7 +678,11 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _resolveStatus(User? firebaseUser) {
     if (firebaseUser == null) return AuthStatus.unauthenticated;
     if (firebaseUser.isAnonymous) return AuthStatus.guest;
-    
+
+    if (firebaseUser.phoneNumber != null && firebaseUser.phoneNumber!.isNotEmpty) {
+      return AuthStatus.authenticated;
+    }
+
     if (firebaseUser.email != null) {
       final userType = detectUserTypeFromEmail(firebaseUser.email!);
       if (userType == 'normal_user' && !firebaseUser.emailVerified) {
@@ -411,7 +691,7 @@ class AuthProvider extends ChangeNotifier {
     } else if (!firebaseUser.emailVerified) {
       return AuthStatus.emailNotVerified;
     }
-    
+
     return AuthStatus.authenticated;
   }
 
@@ -423,6 +703,28 @@ class AuthProvider extends ChangeNotifier {
 
   String _mapAuthError(FirebaseAuthException error) {
     switch (error.code) {
+      case 'invalid-phone-number':
+        return 'رقم الهاتف غير صحيح';
+      case 'missing-phone-number':
+        return 'برجاء إدخال رقم الهاتف';
+      case 'quota-exceeded':
+        return 'تم تجاوز عدد محاولات إرسال الرسائل، حاول لاحقًا';
+      case 'too-many-requests':
+        return 'محاولات كثيرة، حاول لاحقًا';
+      case 'session-expired':
+        return 'انتهت صلاحية كود التحقق، اطلب كود جديد';
+      case 'invalid-verification-code':
+        return 'كود التحقق غير صحيح';
+      case 'missing-verification-code':
+        return 'برجاء إدخال كود التحقق';
+      case 'credential-already-in-use':
+        return 'رقم الهاتف مستخدم في حساب آخر';
+      case 'operation-not-allowed':
+        return 'تسجيل الدخول برقم الهاتف غير مفعل في Firebase';
+      case 'app-not-authorized':
+        return 'التطبيق غير مصرح له باستخدام Firebase Phone Auth';
+      case 'captcha-check-failed':
+        return 'فشل التحقق الأمني، حاول مرة أخرى';
       case 'email-already-in-use':
         return 'هذا البريد مستخدم بالفعل';
       case 'invalid-email':
@@ -437,16 +739,10 @@ class AuthProvider extends ChangeNotifier {
         return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
       case 'network-request-failed':
         return 'تحقق من اتصال الإنترنت';
-      case 'too-many-requests':
-        return 'محاولات كثيرة، حاول لاحقًا';
-      case 'operation-not-allowed':
-        return 'تسجيل البريد وكلمة المرور غير مفعل في Firebase';
       case 'admin-restricted-operation':
         return 'طريقة تسجيل الدخول هذه غير مفعلة في Firebase';
       case 'configuration-not-found':
         return 'إعدادات Firebase Authentication غير مكتملة';
-      case 'app-not-authorized':
-        return 'هذا التطبيق غير مصرح له باستخدام Firebase';
       case 'invalid-api-key':
         return 'مفتاح Firebase غير صحيح';
       case 'channel-error':

@@ -49,4 +49,19 @@ class Reel {
       shares: 45 + (index * 5),
     );
   }
+
+  factory Reel.fromFirestore(String id, Map<String, dynamic> data) {
+    return Reel(
+      id: id,
+      bookTitle: data['bookTitle'] ?? '',
+      author: data['author'] ?? '',
+      quote: data['quote'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
+      videoUrl: data['videoUrl'] ?? '',
+      likes: data['likes'] ?? 0,
+      comments: data['comments'] ?? 0,
+      shares: data['shares'] ?? 0,
+    );
+  }
 }
+

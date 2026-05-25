@@ -344,6 +344,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: const Text('تسجيل الدخول بجوجل'),
                       ),
                       const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: isLoading
+                            ? null
+                            : () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.phoneLogin,
+                                ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                        ),
+                        icon: const Icon(Icons.phone_android_rounded, size: 22),
+                        label: const Text('تسجيل الدخول برقم الهاتف'),
+                      ),
+                      const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: isLoading ? null : _continueAsGuest,
                         style: OutlinedButton.styleFrom(

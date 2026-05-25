@@ -20,6 +20,7 @@ class AppUserModel {
     this.verificationMode = 'firebase_email_verification',
     this.categorySelectionCompleted = false,
     this.categorySelectionSkipped = false,
+    this.phoneNumber,
   });
 
   final String uid;
@@ -39,6 +40,7 @@ class AppUserModel {
   final String verificationMode;
   final bool categorySelectionCompleted;
   final bool categorySelectionSkipped;
+  final String? phoneNumber;
 
   AppUserModel copyWith({
     String? uid,
@@ -58,6 +60,7 @@ class AppUserModel {
     String? verificationMode,
     bool? categorySelectionCompleted,
     bool? categorySelectionSkipped,
+    String? phoneNumber,
   }) {
     return AppUserModel(
       uid: uid ?? this.uid,
@@ -77,6 +80,7 @@ class AppUserModel {
       verificationMode: verificationMode ?? this.verificationMode,
       categorySelectionCompleted: categorySelectionCompleted ?? this.categorySelectionCompleted,
       categorySelectionSkipped: categorySelectionSkipped ?? this.categorySelectionSkipped,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
     );
   }
 
@@ -99,6 +103,7 @@ class AppUserModel {
       'verificationMode': verificationMode,
       'categorySelectionCompleted': categorySelectionCompleted,
       'categorySelectionSkipped': categorySelectionSkipped,
+      if (phoneNumber != null) 'phoneNumber': phoneNumber,
     };
   }
 
@@ -121,6 +126,7 @@ class AppUserModel {
       verificationMode: map['verificationMode'] ?? 'firebase_email_verification',
       categorySelectionCompleted: map['categorySelectionCompleted'] ?? false,
       categorySelectionSkipped: map['categorySelectionSkipped'] ?? false,
+      phoneNumber: map['phoneNumber'],
     );
   }
 
@@ -130,16 +136,17 @@ class AppUserModel {
       name: user.displayName ?? '',
       email: user.email ?? '',
       photoUrl: user.photoURL,
-      provider: 'email',
+      provider: user.phoneNumber != null && user.phoneNumber!.isNotEmpty ? 'phone' : 'email',
       role: 'user',
       isGuest: user.isAnonymous,
       emailVerified: user.emailVerified,
       userType: 'normal_user',
       appEmailVerified: user.emailVerified,
       firebaseEmailVerified: user.emailVerified,
-      verificationMode: 'firebase_email_verification',
+      verificationMode: user.phoneNumber != null && user.phoneNumber!.isNotEmpty ? 'phone_otp' : 'firebase_email_verification',
       categorySelectionCompleted: false,
       categorySelectionSkipped: false,
+      phoneNumber: user.phoneNumber,
     );
   }
 }

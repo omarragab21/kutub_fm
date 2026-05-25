@@ -64,6 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '488612459446',
     projectId: 'kutubfm-1ef89',
     storageBucket: 'kutubfm-1ef89.firebasestorage.app',
+    androidClientId: '488612459446-d9emu89872k3bip31fg3gircgphdp8e5.apps.googleusercontent.com',
+    iosClientId: '488612459446-b3cp8b2rn0sgf07h2h87b63dc842r8au.apps.googleusercontent.com',
     iosBundleId: 'com.example.kutubFm',
   );
 
@@ -73,6 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '488612459446',
     projectId: 'kutubfm-1ef89',
     storageBucket: 'kutubfm-1ef89.firebasestorage.app',
+    androidClientId: '488612459446-d9emu89872k3bip31fg3gircgphdp8e5.apps.googleusercontent.com',
+    iosClientId: '488612459446-b3cp8b2rn0sgf07h2h87b63dc842r8au.apps.googleusercontent.com',
     iosBundleId: 'com.example.kutubFm',
   );
 
@@ -85,4 +89,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'kutubfm-1ef89.firebasestorage.app',
     measurementId: 'G-HGLLPMK5HY',
   );
+
 }

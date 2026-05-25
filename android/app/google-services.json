@@ -12,7 +12,20 @@
           "package_name": "com.example.kutub_fm"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "488612459446-d9emu89872k3bip31fg3gircgphdp8e5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kutub_fm",
+            "certificate_hash": "1da2819df8adb82d76eb1dd6ef1444c17ea8a9ce"
+          }
+        },
+        {
+          "client_id": "488612459446-u8ol9k4ru2jpo1he3avttj16rfu6q5nl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA65UlQGyw_B5WUACVFjSxCKNZ_Tz7qSrE"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "488612459446-u8ol9k4ru2jpo1he3avttj16rfu6q5nl.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "488612459446-b3cp8b2rn0sgf07h2h87b63dc842r8au.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.kutubFm"
+              }
+            }
+          ]
         }
       }
     }

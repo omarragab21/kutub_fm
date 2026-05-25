@@ -142,6 +142,10 @@ class StatsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hours = profile.totalListeningMinutes ~/ 60;
+    final minutes = profile.totalListeningMinutes % 60;
+    final listeningTimeStr = '${hours}س ${minutes}د';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.symmetric(vertical: 20),
@@ -155,7 +159,7 @@ class StatsWidget extends StatelessWidget {
         children: [
           _buildStat(Icons.menu_book_rounded, profile.totalBooksListened.toString(), 'كتاب'),
           _buildDivider(),
-          _buildStat(Icons.access_time_rounded, profile.totalListeningHours, 'ساعة'),
+          _buildStat(Icons.access_time_rounded, listeningTimeStr, 'مدة الاستماع'),
           _buildDivider(),
           _buildStat(Icons.favorite_rounded, profile.favoritesCount.toString(), 'مفضلة'),
         ],

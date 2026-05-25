@@ -15,6 +15,7 @@ class UserFirestoreService {
     bool appEmailVerified = false,
     bool firebaseEmailVerified = false,
     String verificationMode = 'firebase_email_verification',
+    String? phoneNumber,
   }) async {
     try {
       final docRef = _firestore.collection('users').doc(uid);
@@ -34,6 +35,7 @@ class UserFirestoreService {
         'firebaseEmailVerified': firebaseEmailVerified,
         'verificationMode': verificationMode,
         'updatedAt': FieldValue.serverTimestamp(),
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
       };
 
       // We use SetOptions(merge: true) to avoid overwriting existing fields

@@ -6,11 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../core/audio/audio_provider.dart';
 import '../../../../core/audio/audio_models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/transcript_segment.dart';
+import 'package:kutub_fm/features/book_reader/data/services/transcription_api_service.dart';
+import 'package:dio/dio.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -41,11 +44,17 @@ class _BookTheme {
 class BookReaderScreen extends StatefulWidget {
   final String pdfAssetPath; // Kept for route compat; ignored internally
   final String bookTitle;
+  final String? audioUrl;
+  final String? chapterId;
+  final String? transcript;
 
   const BookReaderScreen({
     super.key,
     required this.pdfAssetPath,
     required this.bookTitle,
+    this.audioUrl,
+    this.chapterId,
+    this.transcript,
   });
 
   @override
@@ -56,10 +65,16 @@ class BookReaderScreenArgs {
   const BookReaderScreenArgs({
     required this.pdfAssetPath,
     required this.bookTitle,
+    this.audioUrl,
+    this.chapterId,
+    this.transcript,
   });
 
   final String pdfAssetPath;
   final String bookTitle;
+  final String? audioUrl;
+  final String? chapterId;
+  final String? transcript;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -74,9 +89,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // ── Transcript ─────────────────────────────────────────────────────────
   TranscriptDocument? _doc;
   bool _isLoading = true;
+  String _loadingMessage = 'جاري تهيئة الكتاب…';
   String? _error;
+  String? _resolvedAudioUrl;
   int _activeIndex = -1;
   final List<GlobalKey> _segmentKeys = [];
+  bool _isRequestInProgress = false;
+  CancelToken? _cancelToken;
 
   // ── Scroll ─────────────────────────────────────────────────────────────
   final ScrollController _scrollController = ScrollController();
@@ -84,6 +103,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // ── Controls ───────────────────────────────────────────────────────────
   bool _controlsVisible = true;
   Timer? _hideTimer;
+  bool _autoStopMode = false;
+  bool _isSingleSegmentPlaying = false;
+  double? _singleSegmentEndTime;
 
   // ── Animations ─────────────────────────────────────────────────────────
   late AnimationController _fadeIn;
@@ -111,11 +133,143 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   // ── Transcript loading ─────────────────────────────────────────────────
   Future<void> _loadTranscript() async {
+    if (_isRequestInProgress) return;
+    _isRequestInProgress = true;
+    _cancelToken = CancelToken();
+
     try {
-      final raw = await rootBundle.loadString('assets/transcript.json');
-      final doc = TranscriptDocument.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>,
+      Map<String, dynamic>? chapterData;
+
+      if (widget.chapterId != null && widget.chapterId!.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _loadingMessage = 'جاري البحث عن النص…';
+        });
+
+        final chapterDoc = await FirebaseFirestore.instance
+            .collection('books')
+            .doc(widget.pdfAssetPath)
+            .collection('chapters')
+            .doc(widget.chapterId)
+            .get();
+        chapterData = chapterDoc.data();
+      }
+
+      _resolvedAudioUrl = _resolveAudioUrl(chapterData);
+
+      // 1. If transcript parameter is already provided, decode and render
+      final canTrustRouteTranscript =
+          widget.chapterId == null ||
+          widget.chapterId!.isEmpty ||
+          _effectiveAudioUrl == null;
+      if (canTrustRouteTranscript &&
+          widget.transcript != null &&
+          widget.transcript!.isNotEmpty) {
+        final Map<String, dynamic> decoded =
+            jsonDecode(widget.transcript!) as Map<String, dynamic>;
+        final doc = TranscriptDocument.fromJson(decoded);
+        if (!mounted) return;
+        setState(() {
+          _doc = doc;
+          _segmentKeys
+            ..clear()
+            ..addAll(List.generate(doc.segments.length, (_) => GlobalKey()));
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 2. If chapterId is null or empty, load static asset default
+      if (widget.chapterId == null || widget.chapterId!.isEmpty) {
+        final raw = await rootBundle.loadString('assets/transcript.json');
+        final doc = TranscriptDocument.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
+        if (!mounted) return;
+        setState(() {
+          _doc = doc;
+          _segmentKeys
+            ..clear()
+            ..addAll(List.generate(doc.segments.length, (_) => GlobalKey()));
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 3. Ask the transcript service to read a trusted cached transcript or
+      // generate a new one from the exact audio URL used by playback.
+      if (!mounted) return;
+      setState(() {
+        _loadingMessage = 'جاري توليد نص ذكي…';
+      });
+
+      final chapterTitle =
+          chapterData?['title'] as String? ?? 'شابتر بدون عنوان';
+      final chapterAudioUrl = _resolvedAudioUrl ?? '';
+
+      // Get parent book info
+      final bookDoc = await FirebaseFirestore.instance
+          .collection('books')
+          .doc(widget.pdfAssetPath)
+          .get();
+      final bookData = bookDoc.data() ?? {};
+
+      // Parse metadata
+      final bookTitle = bookData['title'] as String? ?? widget.bookTitle;
+
+      final contributors = bookData['contributors'] as List<dynamic>? ?? [];
+      String authorName = 'غير معروف';
+      String translator = '';
+      String narrator = '';
+      for (final c in contributors) {
+        if (c is Map<String, dynamic>) {
+          final role = c['role'] as String?;
+          final name = c['nameSnapshot'] as String? ?? '';
+          if (role == 'AUTHOR') {
+            authorName = name;
+          } else if (role == 'TRANSLATOR') {
+            translator = name;
+          } else if (role == 'NARRATOR' || role == 'READER') {
+            narrator = name;
+          }
+        }
+      }
+
+      final categorySnapshots =
+          bookData['categorySnapshots'] as List<dynamic>? ?? [];
+      final category = categorySnapshots
+          .map(
+            (c) =>
+                c is Map<String, dynamic> ? (c['name'] as String? ?? '') : '',
+          )
+          .where((name) => name.isNotEmpty)
+          .join('، ');
+      final primaryCategory =
+          bookData['primaryCategorySnapshot'] as Map<String, dynamic>?;
+      final fallbackCategory =
+          primaryCategory?['name'] as String? ?? 'غير محدد';
+      final genre = category.isNotEmpty ? category : fallbackCategory;
+
+      final publisher =
+          bookData['publisherNameSnapshot'] as String? ??
+          bookData['publisher'] as String? ??
+          'كتوب إف إم';
+
+      // Call service
+      final doc = await TranscriptionApiService().getOrGenerateTranscript(
+        bookId: widget.pdfAssetPath,
+        chapterId: widget.chapterId!,
+        chapterTitle: chapterTitle,
+        audioUrl: chapterAudioUrl,
+        bookTitle: bookTitle,
+        authorName: authorName,
+        genre: genre,
+        translator: translator,
+        narrator: narrator,
+        publisher: publisher,
+        cancelToken: _cancelToken,
       );
+
       if (!mounted) return;
       setState(() {
         _doc = doc;
@@ -125,12 +279,47 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         _isLoading = false;
       });
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        log('Transcription API request was cancelled.');
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+    } finally {
+      _isRequestInProgress = false;
     }
+  }
+
+  String? _resolveAudioUrl(Map<String, dynamic>? chapterData) {
+    final chapterAudioUrl = _readString(chapterData, [
+      'audioUrl',
+      'audio_url',
+      'streamUrl',
+      'stream_url',
+      'url',
+    ]);
+    if (chapterAudioUrl.isNotEmpty) return chapterAudioUrl;
+
+    final routeAudioUrl = widget.audioUrl?.trim();
+    if (routeAudioUrl != null && routeAudioUrl.isNotEmpty) {
+      return routeAudioUrl;
+    }
+
+    return null;
+  }
+
+  String _readString(Map<String, dynamic>? data, List<String> keys) {
+    if (data == null) return '';
+    for (final key in keys) {
+      final value = data[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 
   void _syncActive(double sec) {
@@ -173,6 +362,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         audioProvider.playReadingAudio(
           bookId: _readingBookId,
           title: widget.bookTitle,
+          chapterId: widget.chapterId,
+          audioUrl: _effectiveAudioUrl,
           autoplay: true,
         ),
       );
@@ -189,6 +380,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         audioProvider.playReadingAudio(
           bookId: _readingBookId,
           title: widget.bookTitle,
+          chapterId: widget.chapterId,
+          audioUrl: _effectiveAudioUrl,
           autoplay: false,
           initialPosition: Duration(milliseconds: (sec * 1000).round()),
         ),
@@ -206,6 +399,30 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       audioProvider.playReadingAudio(
         bookId: _readingBookId,
         title: widget.bookTitle,
+        chapterId: widget.chapterId,
+        audioUrl: _effectiveAudioUrl,
+        autoplay: true,
+        initialPosition: Duration(milliseconds: (seg.start * 1000).round()),
+      ),
+    );
+  }
+
+  void _playSegmentOnly(int idx) {
+    final audioProvider = context.read<AudioProvider>();
+    final seg = _doc?.segments[idx];
+    if (seg == null) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isSingleSegmentPlaying = true;
+      _singleSegmentEndTime = seg.end;
+      _controlsVisible = true;
+    });
+    unawaited(
+      audioProvider.playReadingAudio(
+        bookId: _readingBookId,
+        title: widget.bookTitle,
+        chapterId: widget.chapterId,
+        audioUrl: _effectiveAudioUrl,
         autoplay: true,
         initialPosition: Duration(milliseconds: (seg.start * 1000).round()),
       ),
@@ -248,9 +465,20 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   String get _readingBookId =>
       widget.pdfAssetPath.isNotEmpty ? widget.pdfAssetPath : widget.bookTitle;
 
+  String? get _effectiveAudioUrl {
+    final resolved = _resolvedAudioUrl?.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    final routeAudio = widget.audioUrl?.trim();
+    if (routeAudio != null && routeAudio.isNotEmpty) return routeAudio;
+    return null;
+  }
+
   bool _isCurrentReadingAudio(AudioProvider audioProvider) {
     return audioProvider.currentMode == AudioMode.readingAudio &&
-        audioProvider.isActiveReadingBook(_readingBookId);
+        audioProvider.isActiveReadingBook(
+          _readingBookId,
+          chapterId: widget.chapterId,
+        );
   }
 
   bool _isArabic(String t) => RegExp(r'[\u0600-\u06FF]').hasMatch(t);
@@ -258,6 +486,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // =========================================================================
   @override
   void dispose() {
+    _cancelToken?.cancel();
     _scrollController.dispose();
     _fadeIn.dispose();
     _pulseCtr.dispose();
@@ -275,9 +504,39 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (!mounted) return;
 
       if (_isCurrentReadingAudio(audioProvider)) {
-        _syncActive(audioProvider.currentPosition.inMilliseconds / 1000.0);
-      } else if (_activeIndex != -1) {
-        setState(() => _activeIndex = -1);
+        final posSec = audioProvider.currentPosition.inMilliseconds / 1000.0;
+        _syncActive(posSec);
+
+        if (_isSingleSegmentPlaying && _singleSegmentEndTime != null) {
+          if (posSec >= _singleSegmentEndTime!) {
+            audioProvider.pause();
+            setState(() {
+              _isSingleSegmentPlaying = false;
+              _singleSegmentEndTime = null;
+              _controlsVisible = false;
+            });
+          }
+        } else if (_autoStopMode &&
+            _activeIndex != -1 &&
+            audioProvider.isPlaying) {
+          final activeSeg = _doc!.segments[_activeIndex];
+          if (posSec >= activeSeg.end) {
+            audioProvider.pause();
+            setState(() {
+              _controlsVisible = false;
+            });
+          }
+        }
+      } else {
+        if (_activeIndex != -1) {
+          setState(() => _activeIndex = -1);
+        }
+        if (_isSingleSegmentPlaying) {
+          setState(() {
+            _isSingleSegmentPlaying = false;
+            _singleSegmentEndTime = null;
+          });
+        }
       }
     });
 
@@ -294,11 +553,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   // ── State views ────────────────────────────────────────────────────────
-  Widget _loadingView() => const Center(
+  Widget _loadingView() => Center(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SizedBox(
+        const SizedBox(
           width: 28,
           height: 28,
           child: CircularProgressIndicator(
@@ -306,10 +565,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             strokeWidth: 1.5,
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         Text(
-          'جاري تهيئة الكتاب…',
-          style: TextStyle(color: _BookTheme.labelColor, fontSize: 14),
+          _loadingMessage,
+          style: const TextStyle(color: _BookTheme.labelColor, fontSize: 14),
         ),
       ],
     ),
@@ -653,6 +912,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return GestureDetector(
       key: _segmentKeys[index],
       onTap: () => _seekBySegment(index),
+      onDoubleTap: () => _playSegmentOnly(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
@@ -870,11 +1130,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              _autoStopToggle(),
+              const SizedBox(width: 16),
               _skipBtn(
                 Icons.replay_10_rounded,
                 () => _skip(-10, effectivePosition, effectiveDuration),
               ),
-              const SizedBox(width: 28),
+              const SizedBox(width: 16),
 
               // Play/Pause
               GestureDetector(
@@ -914,11 +1176,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 ),
               ),
 
-              const SizedBox(width: 28),
+              const SizedBox(width: 16),
               _skipBtn(
                 Icons.forward_10_rounded,
                 () => _skip(10, effectivePosition, effectiveDuration),
               ),
+              const SizedBox(width: 16),
+              _speedBtn(audioProvider.spokenWordSpeed),
             ],
           ),
         ],
@@ -940,6 +1204,66 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ),
         ),
         child: Icon(icon, color: _BookTheme.metaColor, size: 22),
+      ),
+    );
+  }
+
+  Widget _autoStopToggle() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _autoStopMode = !_autoStopMode;
+        });
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: _autoStopMode
+              ? _BookTheme.accent.withValues(alpha: 0.15)
+              : _BookTheme.cardBg,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _autoStopMode
+                ? _BookTheme.accent
+                : _BookTheme.dividerColor.withValues(alpha: 0.8),
+          ),
+        ),
+        child: Icon(
+          _autoStopMode
+              ? Icons.stop_circle_rounded
+              : Icons.stop_circle_outlined,
+          color: _autoStopMode ? _BookTheme.accent : _BookTheme.metaColor,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  Widget _speedBtn(double speed) {
+    return GestureDetector(
+      onTap: _cycleSpeed,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: _BookTheme.cardBg,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _BookTheme.dividerColor.withValues(alpha: 0.8),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            '${speed}x',
+            style: const TextStyle(
+              color: _BookTheme.metaColor,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
     );
   }

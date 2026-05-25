@@ -1,5 +1,4 @@
 import "package:flutter/material.dart";
-import "package:kutub_fm/features/book_details/presentation/pages/book_details_page.dart";
 import "package:kutub_fm/features/reels/presentation/pages/reels_feed_page.dart";
 import 'package:kutub_fm/core/navigation/app_navigation_state.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +7,8 @@ import "../../../../core/routes/app_routes.dart";
 import "../viewmodels/home_view_model.dart";
 import "../../domain/entities/category_entity.dart";
 import "../../domain/entities/book_entity.dart";
+import 'package:kutub_fm/features/profile/presentation/viewmodels/profile_viewmodel.dart';
+import 'package:kutub_fm/features/auth/presentation/providers/auth_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -16,13 +17,31 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewModel = context.watch<HomeViewModel>();
+    final profileViewModel = context.watch<ProfileViewModel>();
+    final authProvider = context.watch<AuthProvider>();
     final hasMiniPlayer = context.watch<AudioProvider>().shouldShowMiniPlayer;
 
-    return _buildBody(viewModel, theme, context, hasMiniPlayer);
+    // Trigger profile fetch if it is in initial state
+    if (profileViewModel.status == ProfileStatus.initial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        profileViewModel.fetchProfile();
+      });
+    }
+
+    return _buildBody(
+      viewModel,
+      profileViewModel,
+      authProvider,
+      theme,
+      context,
+      hasMiniPlayer,
+    );
   }
 
   Widget _buildBody(
     HomeViewModel viewModel,
+    ProfileViewModel profileViewModel,
+    AuthProvider authProvider,
     ThemeData theme,
     BuildContext context,
     bool hasMiniPlayer,
@@ -43,7 +62,7 @@ class HomeScreen extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         // Custom App Bar
-        _buildSliverAppBar(theme),
+        _buildSliverAppBar(profileViewModel, authProvider, theme, context),
 
         SliverPadding(
           padding: EdgeInsets.fromLTRB(24, 24, 24, hasMiniPlayer ? 220 : 160),
@@ -79,7 +98,12 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSliverAppBar(ThemeData theme) {
+  Widget _buildSliverAppBar(
+    ProfileViewModel profileViewModel,
+    AuthProvider authProvider,
+    ThemeData theme,
+    BuildContext context,
+  ) {
     return SliverAppBar(
       pinned: true,
       expandedHeight: 80,
@@ -88,21 +112,11 @@ class HomeScreen extends StatelessWidget {
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
-              ),
-              image: const DecorationImage(
-                image: NetworkImage(
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuCbcWwRMbRSWdy7n25hPeBHNvsY8I3tIgf1keWBcCrm6BWy_cSPyFSvcpKqehCFDNwcGwYle_WCEHvzRM8s69DzXavNKzetg6g3mQUDqow0CJAx7V-fWNziFXbKPtehAFPuJd8SY8SxWr7JTGK92v3EDJ5SCXm9QJEe0Vqx2HwmZPAO1h07Y1RdXFHfXsKuiUd9qYVxNmEdcY26bcSbyqpL47c-b3X0nH2m9xQFSjP06K9X7jUQhFjw5ijtLiSSFWKzRKeV0nHI9_0',
-                ),
-                fit: BoxFit.cover,
-              ),
-            ),
+          GestureDetector(
+            onTap: () {
+              context.read<AppNavigationState>().setSelectedIndex(3);
+            },
+            child: _buildAvatarWidget(profileViewModel, authProvider, theme),
           ),
           ShaderMask(
             shaderCallback: (bounds) => const LinearGradient(
@@ -119,11 +133,133 @@ class HomeScreen extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(Icons.search, color: theme.colorScheme.primary),
-            onPressed: () {},
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.search),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildAvatarWidget(
+    ProfileViewModel profileViewModel,
+    AuthProvider authProvider,
+    ThemeData theme,
+  ) {
+    // 1. Loading State
+    if (profileViewModel.isLoading ||
+        (profileViewModel.status == ProfileStatus.initial)) {
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF2C2C2B),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 2. Error or Guest / Unauthenticated State
+    final profile = profileViewModel.profile;
+    if (profile == null || profileViewModel.status == ProfileStatus.error) {
+      final name = authProvider.isGuest ? 'زائر' : (authProvider.user?.displayName ?? 'مستخدم');
+      return _buildFallbackAvatar(name, theme);
+    }
+
+    // 3. Loaded State
+    final avatarUrl = profile.avatarUrl;
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return _buildFallbackAvatar(profile.name, theme);
+    }
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+        ),
+      ),
+      child: ClipOval(
+        child: Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          width: 40,
+          height: 40,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: const Color(0xFF2C2C2B),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  ),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return _buildFallbackAvatar(profile.name, theme);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackAvatar(String name, ThemeData theme) {
+    final initials = _getInitials(name);
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF2C2C2B),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      if (parts[0].isNotEmpty && parts[1].isNotEmpty) {
+        return '${parts[0][0]}${parts[1][0]}';
+      }
+    }
+    return parts[0].isNotEmpty ? parts[0][0] : '?';
   }
 
   Widget _buildSectionHeader(
@@ -535,9 +671,10 @@ class HomeScreen extends StatelessWidget {
         final book = books[index];
         return GestureDetector(
           onTap: () {
-            Navigator.push(
+            Navigator.pushNamed(
               context,
-              MaterialPageRoute(builder: (context) => BookDetailsPage()),
+              AppRoutes.bookDetails,
+              arguments: book.id,
             );
           },
           child: Row(

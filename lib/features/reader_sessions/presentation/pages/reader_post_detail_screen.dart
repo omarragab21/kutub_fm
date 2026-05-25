@@ -64,13 +64,17 @@ class _ReaderPostDetailScreenState extends State<ReaderPostDetailScreen> {
           elevation: 0,
           title: const Text('تفاصيل المنشور'),
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 if (_replyTarget != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -155,7 +159,8 @@ class _ReaderPostDetailScreenState extends State<ReaderPostDetailScreen> {
             ),
           ),
         ),
-        body: ListView(
+      ),
+      body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
             PostCard(

@@ -59,4 +59,40 @@ class AudioLibraryViewModel extends ChangeNotifier {
   List<AudioStory> get books => _books;
   AudioStory? get featuredBook => _featuredBook;
   bool get isLoading => _isLoading;
+
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+
+  bool get isSearchActive => _isSearchActive;
+  String get searchQuery => _searchQuery;
+
+  void toggleSearch(bool active) {
+    _isSearchActive = active;
+    _searchQuery = '';
+    notifyListeners();
+  }
+
+  void updateSearchQuery(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
+
+  List<AudioStory> get filteredBooks {
+    if (_searchQuery.isEmpty) {
+      return _books;
+    }
+    // Search across all available curated books so user can find multiple stories
+    final allCuratedBooks = [
+      AudioStory.theEnemies,
+      AudioStory.theAlchemist,
+      AudioStory.theStranger,
+      AudioStory.crimeAndPunishment,
+    ];
+    return allCuratedBooks.where((book) {
+      final queryClean = _searchQuery.trim().toLowerCase();
+      final titleMatch = book.title.toLowerCase().contains(queryClean);
+      final authorMatch = book.author.toLowerCase().contains(queryClean);
+      return titleMatch || authorMatch;
+    }).toList();
+  }
 }

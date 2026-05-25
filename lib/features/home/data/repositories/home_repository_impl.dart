@@ -40,37 +40,100 @@ class HomeRepositoryImpl implements HomeRepository {
 
   @override
   Future<List<BookEntity>> getRecommendedBooks() async {
-    // Mocking data for now as per plan
-    await Future.delayed(const Duration(milliseconds: 800));
-    return [
-      BookEntity(
-        id: '1',
-        title: 'طوق الحمامة',
-        author: 'ابن حزم الأندلسي',
-        coverUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuAWFZCLuzVeFM8VOxTMQDaoCX32AsfAoFptyv7ybXLA9nWloCJIFpZRxzNos9lRiewswhOlsRD2rhZhAec2A4g2W5BrwUTXQtuhzSCSreirZ4H1V8DOduYMa41MsMTUC-1yJ9-nLj8Tz4eIesKNLqC3A4w7LvW14LEXOmsTp9Yanh-S9fHtKOgNstHl56ln1egcgonGot07PUeL5o23As7E4ZloPrK1jIXMGrPpiI0Tbetqq9Mil9Ax5HtFfLrQxNgX71ZsUe-zFWc',
-        rating: 4.9,
-        duration: '٨ ساعات',
-      ),
-      BookEntity(
-        id: '2',
-        title: 'مدن الملح',
-        author: 'عبدالرحمن منيف',
-        coverUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuB3Y2apirvC_AC_GljgNERIW6vN2VU2XLDuM6miQcYxg14eKriUyVUF8UOdBiYUihVSjme9wverOPLC7aLqTqaZWcHrtjlOPswnjkI2zh-3k4ahmBUCwyJ2hD18e4Z7IDiQ5xYxEU_iMZHXd9-t4ACOMWzjGWkXBNTDOhdg80fGVaX7Z0in6tELGV5cnBUWqgAVNOEO5fUqKZkshwhJkNEKmHAK1UT7t_1xPnwG2T7VJY70fZlqTFgXgIrauwX1JMsQmcx7RrVowTE',
-        rating: 4.7,
-        duration: '١٥ ساعة',
-      ),
-      BookEntity(
-        id: '3',
-        title: 'رسالة الغفران',
-        author: 'أبو العلاء المعري',
-        coverUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuAffVaFTvImZAjqiBfOil4oF4TMZpaOdEy6CfOkIC5PEFWSKDbdS51fF5hI3uRUAK29XLGc_ZuoQrwIY950n-OayP0DK4KleW-aTLflfiiIfMv0wUSsV553YGCOtOp3myIiA0daC6qpMgWl8RO2wBPTDaE5SPBkjl8ANmMSC-fDzocmR_a6KryJJ54af0slKYLFskA0912aIfhzKR-_9FBmpsqCLPYNCSKlXdB1cv_nTEAu27JFKGJDIgW3P0U68hjbMdMs26O0fv4',
-        rating: 4.8,
-        duration: '١١ ساعة',
-      ),
-    ];
+    try {
+      final snapshot = await _firestore
+          .collection('books')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        final allDocs = await _firestore.collection('books').get();
+        return allDocs.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+      }
+      return snapshot.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+    } catch (e) {
+      final allDocs = await _firestore.collection('books').get();
+      return allDocs.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+    }
+  }
+
+  BookEntity _bookEntityFromSnapshot(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final contributors = data['contributors'] as List<dynamic>? ?? [];
+
+    return BookEntity(
+      id: doc.id,
+      title: data['title'] as String? ?? '',
+      author: _getAuthorFromContributors(contributors),
+      coverUrl: data['imageUrl'] as String? ?? '',
+      rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+      duration: _formatDuration(data['duration'] as String? ?? ''),
+    );
+  }
+
+  String _getAuthorFromContributors(List<dynamic> contributors) {
+    if (contributors.isEmpty) return '';
+    for (final c in contributors) {
+      if (c is Map<String, dynamic>) {
+        if (c['role'] == 'AUTHOR') {
+          return c['nameSnapshot'] ?? '';
+        }
+      }
+    }
+    final first = contributors.first;
+    if (first is Map<String, dynamic>) {
+      return first['nameSnapshot'] ?? '';
+    }
+    return '';
+  }
+
+  String _formatDuration(String durationStr) {
+    if (durationStr.isEmpty) return '';
+    final parts = durationStr.split(':');
+    if (parts.length == 2) {
+      final minutes = int.tryParse(parts[0]);
+      if (minutes != null) {
+        if (minutes == 1) return 'دقيقة واحدة';
+        if (minutes == 2) return 'دقيقتان';
+        if (minutes >= 3 && minutes <= 10) return '$minutes دقائق';
+        return '$minutes دقيقة';
+      }
+    } else if (parts.length == 3) {
+      final hours = int.tryParse(parts[0]);
+      final minutes = int.tryParse(parts[1]);
+      if (hours != null && minutes != null) {
+        String hoursStr = '';
+        if (hours == 1) {
+          hoursStr = 'ساعة';
+        } else if (hours == 2) {
+          hoursStr = 'ساعتان';
+        } else if (hours >= 3 && hours <= 10) {
+          hoursStr = '$hours ساعات';
+        } else {
+          hoursStr = '$hours ساعة';
+        }
+
+        if (minutes == 0) {
+          return hoursStr;
+        }
+
+        String minutesStr = '';
+        if (minutes == 1) {
+          minutesStr = 'دقيقة';
+        } else if (minutes == 2) {
+          minutesStr = 'دقيقتان';
+        } else if (minutes >= 3 && minutes <= 10) {
+          minutesStr = '$minutes دقائق';
+        } else {
+          minutesStr = '$minutes دقيقة';
+        }
+
+        return '$hoursStr و $minutesStr';
+      }
+    }
+    return durationStr;
   }
 
   List<String> _stringList(Object? value) {

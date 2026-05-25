@@ -1,14 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../features/audio_player/data/models/transcript_segment.dart';
 import '../../features/audio_player/data/services/transcript_asset_loader.dart';
 import '../../features/audio_player/domain/entities/audio_story.dart';
 import '../../features/radio/domain/fm_station.dart';
 import '../../features/podcast/domain/entities/podcast_episode.dart';
+import '../../features/book_details/domain/entities/book_detail_model.dart';
 import 'audio_models.dart';
 import 'audio_service.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class AudioProvider extends ChangeNotifier {
   AudioProvider({AudioService? audioService})
@@ -16,7 +21,7 @@ class AudioProvider extends ChangeNotifier {
     _audioService.stateListenable.addListener(_handleServiceStateChanged);
   }
 
-  static const String _spokenWordAssetPath = 'assets/audio_book.mp3';
+  // static const String _spokenWordAssetPath = 'assets/audio_book.mp3';
   static const String _transcriptAssetPath = 'assets/transcript.json';
 
   final AudioService _audioService;
@@ -31,8 +36,12 @@ class AudioProvider extends ChangeNotifier {
   String? _transcriptError;
   FmStation? _currentStation;
   String? _currentReadingBookId;
+  String? _currentReadingChapterId;
   String? _currentReadingBookTitle;
   String? _currentPodcastEpisodeId;
+  String? _currentBookId;
+  Timer? _listeningTimer;
+  int _accumulatedSeconds = 0;
 
   AudioState get state => _audioService.state;
   AudioMode get currentMode => state.mode;
@@ -93,6 +102,7 @@ class AudioProvider extends ChangeNotifier {
   FmStation? get currentStation =>
       currentMode == AudioMode.fmRadio ? _currentStation : null;
   String? get currentReadingBookId => _currentReadingBookId;
+  String? get currentReadingChapterId => _currentReadingChapterId;
   String? get currentReadingBookTitle => _currentReadingBookTitle;
   String? get currentPodcastEpisodeId => _currentPodcastEpisodeId;
   int get currentPositionSeconds => currentPosition.inSeconds;
@@ -117,15 +127,26 @@ class AudioProvider extends ChangeNotifier {
   bool isActiveStory(AudioStory story) =>
       currentMode == AudioMode.audiobook && currentTrack?.id == story.id;
 
-  bool isActiveReadingBook(String bookId) =>
+  bool isActiveReadingBook(String bookId, {String? chapterId}) =>
       currentMode == AudioMode.readingAudio &&
-      currentTrack?.id == _readingTrackId(bookId);
+      currentTrack?.id == _readingTrackId(bookId, chapterId: chapterId);
 
   Future<void> ensureAudiobookLoaded({
     int? index,
     bool autoplay = false,
     Duration initialPosition = Duration.zero,
   }) async {
+    final track = currentTrack;
+    if (track == null || track.id.startsWith('story_')) {
+      if (_stories.isEmpty || !_stories.first.id.startsWith('story_')) {
+        _stories.clear();
+        _stories.addAll(AudioStory.mockList);
+        if (_currentIndex >= _stories.length) {
+          _currentIndex = 0;
+        }
+      }
+    }
+
     if (index != null && index >= 0 && index < _stories.length) {
       _currentIndex = index;
     }
@@ -135,6 +156,8 @@ class AudioProvider extends ChangeNotifier {
     final story = currentStory;
     _clearReadingContext();
     _currentStation = null;
+    _currentBookId = story.id;
+    _markBookAsListened(story.id);
 
     if (isActiveStory(story)) {
       if (initialPosition != Duration.zero) {
@@ -147,17 +170,28 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
+    // Local fallback commented out; loading directly from URL
+    // final isUrl = story.audioUrl != null &&
+    //     (story.audioUrl!.startsWith('http://') ||
+    //         story.audioUrl!.startsWith('https://'));
+    // final source = isUrl ? story.audioUrl! : _spokenWordAssetPath;
+    // final inputType = isUrl ? AudioInputType.uri : AudioInputType.asset;
+    final source = (story.audioUrl != null && story.audioUrl!.isNotEmpty)
+        ? story.audioUrl!
+        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    const inputType = AudioInputType.uri;
+
     try {
       await _audioService.loadTrack(
         AudioTrack(
           id: story.id,
           mode: AudioMode.audiobook,
-          inputType: AudioInputType.asset,
-          source: _spokenWordAssetPath,
+          inputType: inputType,
+          source: source,
           title: story.title,
           artist: story.author,
           album: story.category,
-          artUri: story.coverUrl,
+          artUri: story.coverUrl.isNotEmpty ? story.coverUrl : null,
         ),
         autoplay: autoplay,
         initialPosition: initialPosition,
@@ -170,17 +204,27 @@ class AudioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _currentReadingBookAudioUrl;
+
+  String? get currentReadingBookAudioUrl => _currentReadingBookAudioUrl;
+
   Future<void> playReadingAudio({
     required String bookId,
     required String title,
+    String? chapterId,
+    String? audioUrl,
     bool autoplay = true,
     Duration initialPosition = Duration.zero,
   }) async {
     _currentStation = null;
     _currentReadingBookId = bookId;
+    _currentReadingChapterId = chapterId;
     _currentReadingBookTitle = title;
+    _currentReadingBookAudioUrl = audioUrl;
+    _currentBookId = bookId;
+    _markBookAsListened(bookId);
 
-    if (isActiveReadingBook(bookId)) {
+    if (isActiveReadingBook(bookId, chapterId: chapterId)) {
       if (initialPosition != Duration.zero) {
         await _audioService.seek(initialPosition);
       }
@@ -191,13 +235,19 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
+    // Local fallback commented out; loading directly from URL
+    final source = (audioUrl != null && audioUrl.isNotEmpty)
+        ? audioUrl
+        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    const inputType = AudioInputType.uri;
+
     try {
       await _audioService.loadTrack(
         AudioTrack(
-          id: _readingTrackId(bookId),
+          id: _readingTrackId(bookId, chapterId: chapterId),
           mode: AudioMode.readingAudio,
-          inputType: AudioInputType.asset,
-          source: _spokenWordAssetPath,
+          inputType: inputType,
+          source: source,
           title: title,
           artist: 'القراءة الصوتية',
           album: 'كتاب صوتي',
@@ -213,12 +263,100 @@ class AudioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool isActiveChapter(String chapterId) =>
+      currentMode == AudioMode.audiobook && currentTrack?.id == chapterId;
+
+  Future<void> playChapterAudio({
+    required String bookId,
+    required Chapter chapter,
+    required List<Chapter> chapters,
+    required String bookTitle,
+    String? bookCoverUrl,
+    String? author,
+    bool autoplay = true,
+    Duration initialPosition = Duration.zero,
+  }) async {
+    _clearReadingContext();
+    _currentStation = null;
+    _currentBookId = bookId;
+    _markBookAsListened(bookId);
+
+    // Convert all chapters to AudioStory entities
+    final chaptersStories = chapters.map((ch) {
+      return AudioStory(
+        id: ch.id,
+        title: ch.title,
+        author: author ?? 'غير معروف',
+        description: 'شابتر من كتاب $bookTitle',
+        category: bookTitle,
+        coverUrl: bookCoverUrl ?? '',
+        totalDurationSeconds: _parseDurationToSeconds(ch.duration),
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        audioUrl: ch.audioUrl,
+      );
+    }).toList();
+
+    _stories.clear();
+    _stories.addAll(chaptersStories);
+
+    final idx = chaptersStories.indexWhere((s) => s.id == chapter.id);
+    if (idx != -1) {
+      _currentIndex = idx;
+    }
+
+    // Local fallback commented out; loading directly from URL
+    // final isUrl = chapter.audioUrl.startsWith('http://') || chapter.audioUrl.startsWith('https://');
+    // final source = isUrl ? chapter.audioUrl : _spokenWordAssetPath;
+    // final inputType = isUrl ? AudioInputType.uri : AudioInputType.asset;
+    final source = chapter.audioUrl.isNotEmpty
+        ? chapter.audioUrl
+        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    const inputType = AudioInputType.uri;
+
+    if (isActiveChapter(chapter.id)) {
+      if (initialPosition != Duration.zero) {
+        await _audioService.seek(initialPosition);
+      }
+      if (autoplay && !isPlaying) {
+        await _audioService.play();
+      }
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _audioService.loadTrack(
+        AudioTrack(
+          id: chapter.id,
+          mode: AudioMode.audiobook,
+          inputType: inputType,
+          source: source,
+          title: chapter.title,
+          artist: author ?? 'غير معروف',
+          album: bookTitle,
+          artUri: bookCoverUrl,
+        ),
+        autoplay: autoplay,
+        initialPosition: initialPosition,
+        speed: _spokenWordSpeed,
+      );
+    } catch (_) {
+      // Error handled by AudioService
+    }
+
+    notifyListeners();
+  }
+
   Future<void> playStation(
     FmStation station, {
     required String streamUrl,
   }) async {
     _clearReadingContext();
     _currentStation = station;
+    _currentBookId = null;
 
     try {
       await _audioService.loadTrack(
@@ -247,14 +385,32 @@ class AudioProvider extends ChangeNotifier {
     _clearReadingContext();
     _currentStation = null;
     _currentPodcastEpisodeId = episode.id;
+    _currentBookId = null;
 
     try {
+      String sourceUrl = episode.audioUrl;
+      if (episode.youtubeUrl != null && episode.youtubeUrl!.isNotEmpty) {
+        final yt = yt_explode.YoutubeExplode();
+        try {
+          final videoId = YoutubePlayer.convertUrlToId(episode.youtubeUrl!);
+          if (videoId != null) {
+            final manifest = await yt.videos.streamsClient.getManifest(videoId);
+            final streamInfo = manifest.audioOnly.withHighestBitrate();
+            sourceUrl = streamInfo.url.toString();
+          }
+        } catch (e) {
+          debugPrint('Error extracting YouTube audio stream: $e');
+        } finally {
+          yt.close();
+        }
+      }
+
       await _audioService.loadTrack(
         AudioTrack(
           id: episode.id,
           mode: AudioMode.podcast,
           inputType: AudioInputType.uri,
-          source: episode.audioUrl,
+          source: sourceUrl,
           title: episode.title,
           artist: 'بودكاست',
           album: episode.category,
@@ -357,6 +513,10 @@ class AudioProvider extends ChangeNotifier {
       _currentPodcastEpisodeId = null;
     }
     _clearReadingContext();
+    _currentBookId = null;
+    _listeningTimer?.cancel();
+    _listeningTimer = null;
+    _accumulatedSeconds = 0;
     notifyListeners();
   }
 
@@ -364,6 +524,7 @@ class AudioProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _listeningTimer?.cancel();
     _audioService.stateListenable.removeListener(_handleServiceStateChanged);
     unawaited(_audioService.dispose());
     super.dispose();
@@ -387,13 +548,146 @@ class AudioProvider extends ChangeNotifier {
   }
 
   void _handleServiceStateChanged() {
+    _updateListeningTimer();
     notifyListeners();
   }
 
-  static String _readingTrackId(String bookId) => 'reading:$bookId';
+  void _updateListeningTimer() {
+    final user = FirebaseAuth.instance.currentUser;
+    final isUserLoggedIn = user != null && !user.isAnonymous;
+    final isTimerActive = isPlaying && isUserLoggedIn && _currentBookId != null;
+
+    if (isTimerActive) {
+      if (_listeningTimer == null) {
+        _listeningTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser == null || currentUser.isAnonymous) {
+            timer.cancel();
+            _listeningTimer = null;
+            return;
+          }
+          _accumulatedSeconds++;
+          if (_accumulatedSeconds >= 60) {
+            _accumulatedSeconds = 0;
+            _incrementListeningMinutes();
+          }
+        });
+      }
+    } else {
+      _listeningTimer?.cancel();
+      _listeningTimer = null;
+    }
+  }
+
+  Future<void> _incrementListeningMinutes() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+
+    try {
+      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userDocRef);
+        if (!snapshot.exists) return;
+
+        final data = snapshot.data()!;
+        final currentMinutes = (data['totalListeningMinutes'] as num?)?.toInt() ?? 0;
+        final newMinutes = currentMinutes + 1;
+
+        List<int> weekly = const [0, 0, 0, 0, 0, 0, 0];
+        if (data['weeklyActivityMinutes'] != null) {
+          weekly = List<int>.from(data['weeklyActivityMinutes']);
+        }
+        if (weekly.length != 7) {
+          weekly = [0, 0, 0, 0, 0, 0, 0];
+        }
+
+        final weekdayIndex = DateTime.now().weekday - 1; // 0-based for Mon-Sun
+        weekly[weekdayIndex] = weekly[weekdayIndex] + 1;
+
+        transaction.update(userDocRef, {
+          'totalListeningMinutes': newMinutes,
+          'weeklyActivityMinutes': weekly,
+        });
+      });
+    } catch (e) {
+      debugPrint('Error incrementing listening minutes: $e');
+    }
+  }
+
+  Future<void> _markBookAsListened(String bookId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+
+    try {
+      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final listenedDocRef = userDocRef.collection('listened_books').doc(bookId);
+
+      final doc = await listenedDocRef.get();
+      if (!doc.exists) {
+        await listenedDocRef.set({
+          'bookId': bookId,
+          'listenedAt': FieldValue.serverTimestamp(),
+        });
+        await userDocRef.update({
+          'totalBooksListened': FieldValue.increment(1),
+        });
+      }
+    } catch (e) {
+      debugPrint('Error marking book as listened: $e');
+    }
+  }
+
+  static String _readingTrackId(String bookId, {String? chapterId}) {
+    final normalizedChapterId = chapterId?.trim();
+    if (normalizedChapterId == null || normalizedChapterId.isEmpty) {
+      return 'reading:$bookId';
+    }
+    return 'reading:$bookId:$normalizedChapterId';
+  }
 
   void _clearReadingContext() {
     _currentReadingBookId = null;
+    _currentReadingChapterId = null;
     _currentReadingBookTitle = null;
+    _currentReadingBookAudioUrl = null;
+  }
+
+  static int _parseDurationToSeconds(String durationStr) {
+    try {
+      final parts = durationStr.split(':');
+      if (parts.length == 2) {
+        final minutes = int.parse(parts[0]);
+        final seconds = int.parse(parts[1]);
+        return minutes * 60 + seconds;
+      } else if (parts.length == 3) {
+        final hours = int.parse(parts[0]);
+        final minutes = int.parse(parts[1]);
+        final seconds = int.parse(parts[2]);
+        return hours * 3600 + minutes * 60 + seconds;
+      }
+    } catch (_) {}
+
+    try {
+      final hoursRegex = RegExp(r'(\d+)h');
+      final minutesRegex = RegExp(r'(\d+)m');
+      final secondsRegex = RegExp(r'(\d+)s');
+
+      int total = 0;
+      final hMatch = hoursRegex.firstMatch(durationStr);
+      if (hMatch != null) {
+        total += int.parse(hMatch.group(1)!) * 3600;
+      }
+      final mMatch = minutesRegex.firstMatch(durationStr);
+      if (mMatch != null) {
+        total += int.parse(mMatch.group(1)!) * 60;
+      }
+      final sMatch = secondsRegex.firstMatch(durationStr);
+      if (sMatch != null) {
+        total += int.parse(sMatch.group(1)!);
+      }
+      if (total > 0) return total;
+    } catch (_) {}
+
+    return 0;
   }
 }

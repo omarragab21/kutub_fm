@@ -47,6 +47,17 @@ class BookMetadata {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'author': author,
+      'genre': genre,
+      'translator': translator,
+      'narrator': narrator,
+      'publisher': publisher,
+    };
+  }
+
   bool get isEmpty =>
       title.isEmpty &&
       author.isEmpty &&
@@ -68,6 +79,13 @@ class TranscriptDocument {
           .map((s) => TranscriptSegment.fromJson(s as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      ...metadata.toJson(),
+      'segments': segments.map((s) => s.toJson()).toList(),
+    };
   }
 
   bool get isEmpty => segments.isEmpty;
@@ -98,5 +116,15 @@ class TranscriptSegment {
       end: (json['end'] as num?)?.toDouble() ?? 0.0,
       type: TranscriptSegmentType.fromString(json['type']?.toString()),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'text': text,
+      'start': start,
+      'end': end,
+      'type': type.name,
+    };
   }
 }

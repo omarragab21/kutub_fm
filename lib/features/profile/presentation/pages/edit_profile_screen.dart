@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -13,9 +14,15 @@ class EditProfileScreen extends StatefulWidget {
     String email,
     String bio,
     List<String> categories,
+    int totalBooksListened,
+    int totalListeningMinutes,
+    int favoritesCount,
+    int followersCount,
+    int followingCount,
+    List<int> weeklyActivityMinutes,
+    List<ContinueListeningItem> continueListening,
     File? newProfileImage,
-  )
-  onSave;
+  ) onSave;
 
   const EditProfileScreen({
     super.key,
@@ -33,23 +40,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _bioController;
   late List<String> _selectedCategories;
+
+  List<String> _allCategories = [];
+  bool _isLoadingCategories = true;
+  String? _categoriesError;
+
   File? _newProfileImage;
   bool _isSaving = false;
-
-  static const _allCategories = [
-    'تاريخ',
-    'فلسفة',
-    'رواية',
-    'علوم',
-    'تنمية',
-    'دين',
-    'سياسة',
-    'اقتصاد',
-    'أدب',
-    'شعر',
-    'تكنولوجيا',
-    'رياضة',
-  ];
 
   @override
   void initState() {
@@ -58,6 +55,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _emailController = TextEditingController(text: widget.profile.email);
     _bioController = TextEditingController(text: widget.profile.bio ?? '');
     _selectedCategories = List.from(widget.profile.favoriteCategories);
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoadingCategories = true;
+      _categoriesError = null;
+    });
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('categories')
+          .orderBy('createdAt')
+          .get();
+      
+      final categories = snapshot.docs.map((doc) {
+        final data = doc.data();
+        for (final key in const ['name', 'title', 'nameAr', 'arabicName']) {
+          final val = data[key];
+          if (val is String && val.trim().isNotEmpty) {
+            return val.trim();
+          }
+        }
+        return doc.id;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _allCategories = categories;
+          _isLoadingCategories = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _categoriesError = 'تعذر تحميل التصنيفات';
+          _isLoadingCategories = false;
+        });
+      }
+    }
   }
 
   @override
@@ -85,11 +121,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
     await Future.delayed(const Duration(milliseconds: 200));
+
     await widget.onSave(
       _nameController.text.trim(),
       _emailController.text.trim(),
       _bioController.text.trim(),
       _selectedCategories,
+      widget.profile.totalBooksListened,
+      widget.profile.totalListeningMinutes,
+      widget.profile.favoritesCount,
+      widget.profile.followersCount,
+      widget.profile.followingCount,
+      widget.profile.weeklyActivityMinutes,
+      widget.profile.continueListening,
       _newProfileImage,
     );
     if (mounted) Navigator.of(context).pop();
@@ -213,53 +257,86 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Category chips
             _buildLabel('اهتماماتي'),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _allCategories.map((cat) {
-                final isSelected = _selectedCategories.contains(cat);
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedCategories.remove(cat);
-                      } else {
-                        _selectedCategories.add(cat);
-                      }
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppTheme.primary.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppTheme.primary
-                            : Colors.white.withValues(alpha: 0.12),
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      cat,
-                      style: TextStyle(
-                        color: isSelected ? AppTheme.primary : Colors.white60,
-                        fontSize: 13,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
+            if (_isLoadingCategories)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              )
+            else if (_categoriesError != null)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      Text(
+                        _categoriesError!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _loadCategories,
+                        icon: const Icon(Icons.refresh, color: AppTheme.primary),
+                        label: const Text(
+                          'إعادة المحاولة',
+                          style: TextStyle(color: AppTheme.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _allCategories.map((cat) {
+                  final isSelected = _selectedCategories.contains(cat);
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedCategories.remove(cat);
+                        } else {
+                          _selectedCategories.add(cat);
+                        }
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.primary.withValues(alpha: 0.15)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppTheme.primary
+                              : Colors.white.withValues(alpha: 0.12),
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          color: isSelected ? AppTheme.primary : Colors.white60,
+                          fontSize: 13,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ),
       ),
@@ -328,6 +405,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required TextEditingController controller,
     required String hint,
     int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
     ValueChanged<String>? onChanged,
   }) {
@@ -336,6 +414,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       validator: validator,
       onChanged: onChanged,
       maxLines: maxLines,
+      keyboardType: keyboardType,
       textDirection: TextDirection.rtl,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(

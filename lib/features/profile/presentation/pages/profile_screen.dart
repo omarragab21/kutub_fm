@@ -14,6 +14,8 @@ import 'package:kutub_fm/features/subscription/data/datasources/apple_pay_data_s
 import 'package:kutub_fm/features/subscription/data/datasources/google_play_data_source.dart';
 import 'package:kutub_fm/features/subscription/data/datasources/wallet_payment_data_source.dart';
 import 'package:kutub_fm/features/subscription/data/datasources/credit_card_payment_data_source.dart';
+import 'package:kutub_fm/features/reels/presentation/pages/reels_feed_page.dart';
+
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -183,30 +185,41 @@ class _ProfileView extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: profile.favoriteCategories.map((cat) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppTheme.primary.withValues(alpha: 0.3),
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ReelsFeedPage(category: cat),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
                           ),
-                        ),
-                        child: Text(
-                          cat,
-                          style: const TextStyle(
-                            color: AppTheme.primary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            cat,
+                            style: const TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       );
                     }).toList(),
                   ),
                 ),
+
                 const SizedBox(height: 28),
 
                 // ── Weekly Heatmap ───────────────────────────────────
@@ -216,9 +229,12 @@ class _ProfileView extends StatelessWidget {
                 const SizedBox(height: 28),
 
                 // ── Achievements ─────────────────────────────────────
-                _SectionTitle(title: 'الإنجازات 🏆'),
-                const SizedBox(height: 12),
-                _AchievementsRow(totalMinutes: profile.totalListeningMinutes),
+                if (profile.achievements.isNotEmpty) ...[
+                  _SectionTitle(title: 'الإنجازات 🏆'),
+                  const SizedBox(height: 12),
+                  _AchievementsRow(achievements: profile.achievements),
+                  const SizedBox(height: 28),
+                ],
                 const SizedBox(height: 120),
               ],
             ),
@@ -246,13 +262,33 @@ class _ProfileView extends StatelessWidget {
                 ),
             child: EditProfileScreen(
               profile: profile,
-              onSave: (name, email, bio, categories, newProfileImage) async {
+              onSave: (
+                name,
+                email,
+                bio,
+                categories,
+                totalBooksListened,
+                totalListeningMinutes,
+                favoritesCount,
+                followersCount,
+                followingCount,
+                weeklyActivityMinutes,
+                continueListening,
+                newProfileImage,
+              ) async {
                 await Future.wait([
                   viewModel.updateProfile(
                     name: name,
                     email: email,
                     bio: bio,
                     favoriteCategories: categories,
+                    totalBooksListened: totalBooksListened,
+                    totalListeningMinutes: totalListeningMinutes,
+                    favoritesCount: favoritesCount,
+                    followersCount: followersCount,
+                    followingCount: followingCount,
+                    weeklyActivityMinutes: weeklyActivityMinutes,
+                    continueListening: continueListening,
                     profileImage: newProfileImage,
                   ),
                   context.read<AuthProvider>().updateProfileName(name),
@@ -402,28 +438,20 @@ class _EditButton extends StatelessWidget {
 }
 
 class _AchievementsRow extends StatelessWidget {
-  final int totalMinutes;
-  const _AchievementsRow({required this.totalMinutes});
+  final List<UserAchievement> achievements;
+  const _AchievementsRow({required this.achievements});
 
   @override
   Widget build(BuildContext context) {
-    final hours = totalMinutes ~/ 60;
-    final badges = <({String icon, String title, String desc, bool unlocked})>[
-      (icon: '📖', title: 'القارئ', desc: '10 كتب', unlocked: true),
-      (icon: '🎧', title: 'المستمع', desc: '50 ساعة', unlocked: hours >= 50),
-      (icon: '🌟', title: 'النجم', desc: '100 ساعة', unlocked: hours >= 100),
-      (icon: '🔥', title: 'المتحمس', desc: '7 أيام متواصلة', unlocked: true),
-    ];
-
     return SizedBox(
       height: 110,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: badges.length,
+        itemCount: achievements.length,
         separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
-          final b = badges[i];
+          final b = achievements[i];
           return AnimatedOpacity(
             opacity: b.unlocked ? 1.0 : 0.35,
             duration: const Duration(milliseconds: 400),
@@ -446,6 +474,8 @@ class _AchievementsRow extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     b.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -454,6 +484,8 @@ class _AchievementsRow extends StatelessWidget {
                   ),
                   Text(
                     b.desc,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.45),
                       fontSize: 9,

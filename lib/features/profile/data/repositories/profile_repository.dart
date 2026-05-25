@@ -25,15 +25,33 @@ class ProfileRepository {
       name: data['name'] ?? user.displayName ?? '',
       email: user.email ?? data['email'] ?? '',
       avatarUrl: data['photoUrl'] ?? user.photoURL,
-      bio: data['bio'] ?? _mockProfile.bio,
-      favoriteCategories: List<String>.from(data['favoriteCategories'] ?? _mockProfile.favoriteCategories),
-      totalBooksListened: data['totalBooksListened'] ?? _mockProfile.totalBooksListened,
-      totalListeningMinutes: data['totalListeningMinutes'] ?? _mockProfile.totalListeningMinutes,
-      favoritesCount: data['favoritesCount'] ?? _mockProfile.favoritesCount,
-      followersCount: data['followersCount'] ?? _mockProfile.followersCount,
-      followingCount: data['followingCount'] ?? _mockProfile.followingCount,
-      weeklyActivityMinutes: _mockProfile.weeklyActivityMinutes,
-      continueListening: _mockProfile.continueListening,
+      bio: data['bio'] ?? '',
+      favoriteCategories: List<String>.from(data['favoriteCategories'] ?? const []),
+      totalBooksListened: data['totalBooksListened'] ?? 0,
+      totalListeningMinutes: data['totalListeningMinutes'] ?? 0,
+      favoritesCount: data['favoritesCount'] ?? 0,
+      followersCount: data['followersCount'] ?? 0,
+      followingCount: data['followingCount'] ?? 0,
+      weeklyActivityMinutes: data['weeklyActivityMinutes'] != null
+          ? List<int>.from(data['weeklyActivityMinutes'])
+          : const [0, 0, 0, 0, 0, 0, 0],
+      continueListening: data['continueListening'] != null
+          ? (data['continueListening'] as List)
+              .map((item) => ContinueListeningItem(
+                    id: item['id'] ?? '',
+                    title: item['title'] ?? '',
+                    author: item['author'] ?? '',
+                    coverUrl: item['coverUrl'] ?? '',
+                    progress: ((item['progress'] ?? 0.0) as num).toDouble(),
+                    lastChapter: item['lastChapter'] ?? '',
+                  ))
+              .toList()
+          : const [],
+      achievements: data['achievements'] != null
+          ? (data['achievements'] as List)
+              .map((item) => UserAchievement.fromMap(Map<String, dynamic>.from(item)))
+              .toList()
+          : const [],
     );
   }
 
@@ -42,6 +60,13 @@ class ProfileRepository {
     required String email,
     required String bio,
     required List<String> favoriteCategories,
+    required int totalBooksListened,
+    required int totalListeningMinutes,
+    required int favoritesCount,
+    required int followersCount,
+    required int followingCount,
+    required List<int> weeklyActivityMinutes,
+    required List<ContinueListeningItem> continueListening,
     String? avatarUrl,
     File? profileImage,
   }) async {
@@ -61,6 +86,23 @@ class ProfileRepository {
       'name': name,
       'bio': bio,
       'favoriteCategories': favoriteCategories,
+      'totalBooksListened': totalBooksListened,
+      'totalListeningMinutes': totalListeningMinutes,
+      'favoritesCount': favoritesCount,
+      'followersCount': followersCount,
+      'followingCount': followingCount,
+      'weeklyActivityMinutes': weeklyActivityMinutes,
+      'continueListening': continueListening
+          .map((item) => {
+                'id': item.id,
+                'title': item.title,
+                'author': item.author,
+                'coverUrl': item.coverUrl,
+                'progress': item.progress,
+                'lastChapter': item.lastChapter,
+              })
+          .toList(),
+      'categorySelectionCompleted': true,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 

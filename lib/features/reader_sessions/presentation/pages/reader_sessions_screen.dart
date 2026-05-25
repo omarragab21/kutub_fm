@@ -77,44 +77,83 @@ class _ReaderSessionsScreenState extends State<ReaderSessionsScreen> {
                               child: _FeedHeader(provider: provider),
                             ),
                           ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
-                            sliver: SliverList.separated(
-                              itemCount: provider.posts.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(height: 16),
-                              itemBuilder: (context, index) {
-                                final post = provider.posts[index];
-                                return _Reveal(
-                                  delay: Duration(milliseconds: 40 * index),
-                                  child: PostCard(
-                                    post: post,
-                                    timestampLabel: provider.formatTimestamp(
-                                      post.createdAt,
+                          if (provider.posts.isEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 40,
+                                  vertical: 80,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.forum_outlined,
+                                      size: 64,
+                                      color: Colors.white.withValues(alpha: 0.15),
                                     ),
-                                    onTap: () {
-                                      Navigator.of(context).pushNamed(
-                                        AppRoutes.readerPostDetail,
-                                        arguments: ReaderPostDetailArgs(
-                                          postId: post.id,
-                                        ),
-                                      );
-                                    },
-                                    onLikeTap: () =>
-                                        provider.toggleLike(post.id),
-                                    onCommentTap: () {
-                                      Navigator.of(context).pushNamed(
-                                        AppRoutes.readerPostDetail,
-                                        arguments: ReaderPostDetailArgs(
-                                          postId: post.id,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
+                                    const SizedBox(height: 18),
+                                    const Text(
+                                      'لا توجد منشورات اليوم',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'لا توجد منشورات خالص حالياً في مجلس القراء.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white38,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+                              sliver: SliverList.separated(
+                                itemCount: provider.posts.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 16),
+                                itemBuilder: (context, index) {
+                                  final post = provider.posts[index];
+                                  return _Reveal(
+                                    delay: Duration(milliseconds: 40 * index),
+                                    child: PostCard(
+                                      post: post,
+                                      timestampLabel: provider.formatTimestamp(
+                                        post.createdAt,
+                                      ),
+                                      onTap: () {
+                                        Navigator.of(context).pushNamed(
+                                          AppRoutes.readerPostDetail,
+                                          arguments: ReaderPostDetailArgs(
+                                            postId: post.id,
+                                          ),
+                                        );
+                                      },
+                                      onLikeTap: () =>
+                                          provider.toggleLike(post.id),
+                                      onCommentTap: () {
+                                        Navigator.of(context).pushNamed(
+                                          AppRoutes.readerPostDetail,
+                                          arguments: ReaderPostDetailArgs(
+                                            postId: post.id,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),

@@ -1,9 +1,20 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/audio/audio_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../book_reader/presentation/pages/book_reader_screen.dart';
+import '../../domain/entities/book_detail_model.dart';
+import 'creator_details_page.dart';
+import '../viewmodels/book_details_view_model.dart';
+import '../../data/repositories/book_details_repository_impl.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
 // MOCK DATA MODEL
@@ -34,69 +45,33 @@ class BookMockData {
 // ════════════════════════════════════════════════════════════════════════════
 class BookReview {
   final String id;
+  final String userId;
   final String authorName;
   final String avatarUrl;
   final String text;
   final int rating; // 1–5 stars
   final String timeAgo;
+  final DateTime? createdAt;
+  final DocumentReference<Map<String, dynamic>>? ref;
+  final List<BookReview> replies;
   int likes;
   bool isLikedByMe;
 
   BookReview({
     required this.id,
+    required this.userId,
     required this.authorName,
     required this.avatarUrl,
     required this.text,
     required this.rating,
     required this.timeAgo,
+    this.createdAt,
+    this.ref,
+    this.replies = const [],
     this.likes = 0,
     this.isLikedByMe = false,
   });
 }
-
-// Separate singleton list so new posts persist while user scrolls
-final List<BookReview> _mockReviews = [
-  BookReview(
-    id: '1',
-    authorName: 'سارة خالد',
-    avatarUrl: 'https://i.pravatar.cc/150?img=1',
-    text:
-        'من أروع ما قرأت في الأدب الروسي. تشيخوف قادر بجملة واحدة أن يرسم عالماً كاملاً. الترجمة أيضاً رائعة وبسيطة.',
-    rating: 5,
-    timeAgo: 'منذ يومين',
-    likes: 34,
-  ),
-  BookReview(
-    id: '2',
-    authorName: 'محمد العمري',
-    avatarUrl: 'https://i.pravatar.cc/150?img=3',
-    text:
-        'قصة قصيرة لكنها عميقة جداً. الصراع بين الألم الشخصي والواجب الإنساني يجعلك تتأمل طويلاً بعد انتهائها.',
-    rating: 5,
-    timeAgo: 'منذ 5 ساعات',
-    likes: 21,
-  ),
-  BookReview(
-    id: '3',
-    authorName: 'لمياء الزهراني',
-    avatarUrl: 'https://i.pravatar.cc/150?img=5',
-    text:
-        'الأداء الصوتي ممتاز وجميل جداً. يضيف بُعداً آخر للقصة. أتمنى المزيد من الأعمال المترجمة بهذا المستوى.',
-    rating: 4,
-    timeAgo: 'منذ 3 أيام',
-    likes: 18,
-  ),
-  BookReview(
-    id: '4',
-    authorName: 'فيصل الدوسري',
-    avatarUrl: 'https://i.pravatar.cc/150?img=8',
-    text:
-        'استمعت إليها مرتين. في كل مرة أكتشف تفصيلاً جديداً لم أنتبه إليه. عبقرية تشيخوف في الاختزال مذهلة.',
-    rating: 5,
-    timeAgo: 'منذ أسبوع',
-    likes: 45,
-  ),
-];
 
 // ════════════════════════════════════════════════════════════════════════════
 // THEME
@@ -113,7 +88,8 @@ class _T {
 // MAIN SCREEN (StatefulWidget for reviews state)
 // ════════════════════════════════════════════════════════════════════════════
 class BookDetailsPage extends StatefulWidget {
-  const BookDetailsPage({super.key});
+  final String? bookId;
+  const BookDetailsPage({super.key, this.bookId});
 
   @override
   State<BookDetailsPage> createState() => _BookDetailsPageState();
@@ -121,19 +97,46 @@ class BookDetailsPage extends StatefulWidget {
 
 class _BookDetailsPageState extends State<BookDetailsPage> {
   // ── Review state ────────────────────────────────────────────────────────
-  final List<BookReview> _reviews = List.from(_mockReviews);
+  List<BookReview> _reviews = const [];
   int _pendingStars = 0; // stars chosen by user before submitting
+  bool _isReviewsLoading = true;
+  String? _reviewsError;
+  BookReview? _replyTarget;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _commentsSub;
 
   // ── Add-review sheet controller ─────────────────────────────────────────
   final TextEditingController _commentCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _listenToBookComments();
+  }
+
+  @override
+  void didUpdateWidget(covariant BookDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.bookId != widget.bookId) {
+      _listenToBookComments();
+    }
+  }
+
+  @override
   void dispose() {
+    _commentsSub?.cancel();
     _commentCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
   }
+
+  String get _targetBookId => widget.bookId ?? 'book_late_arrival';
+
+  CollectionReference<Map<String, dynamic>> get _commentsCollection =>
+      FirebaseFirestore.instance
+          .collection('books')
+          .doc(_targetBookId)
+          .collection('comments');
 
   // ── Average rating ───────────────────────────────────────────────────────
   double get _avgRating {
@@ -142,47 +145,93 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   // ── Add review ────────────────────────────────────────────────────────────
-  void _submitReview() {
+  Future<void> _submitReview() async {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty) return;
+    final auth = context.read<AuthProvider>();
+    final user = auth.user;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('سجل الدخول لإضافة تعليق')));
+      return;
+    }
+
     final stars = _pendingStars == 0 ? 5 : _pendingStars;
-    setState(() {
-      _reviews.insert(
-        0,
-        BookReview(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          authorName: 'أنت',
-          avatarUrl: 'https://i.pravatar.cc/150?img=12',
-          text: text,
-          rating: stars,
-          timeAgo: 'الآن',
-          likes: 0,
-        ),
-      );
-      _pendingStars = 0;
-    });
-    _commentCtrl.clear();
-    _focusNode.unfocus();
-    Navigator.pop(context); // close bottom sheet
-    HapticFeedback.mediumImpact();
+    final userName = _currentUserName(auth);
+    final userAvatar = _currentUserAvatar(auth);
+
+    try {
+      final replyTarget = _replyTarget;
+      final payload = {
+        'userId': user.uid,
+        'userName': userName,
+        'userAvatar': userAvatar,
+        'text': text,
+        'rating': replyTarget == null ? stars : 0,
+        'likesCount': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (replyTarget == null) {
+        await _commentsCollection.add(payload);
+      } else {
+        await replyTarget.ref?.collection('replies').add(payload);
+      }
+
+      setState(() {
+        _pendingStars = 0;
+        _replyTarget = null;
+      });
+      _commentCtrl.clear();
+      _focusNode.unfocus();
+      if (mounted) Navigator.pop(context);
+      HapticFeedback.mediumImpact();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر حفظ التعليق: $error')));
+    }
   }
 
   // ── Like toggle ───────────────────────────────────────────────────────────
-  void _toggleLike(BookReview review) {
-    setState(() {
-      if (review.isLikedByMe) {
-        review.likes--;
-        review.isLikedByMe = false;
+  Future<void> _toggleLike(BookReview review) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null || review.ref == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('سجل الدخول لتسجيل الإعجاب')),
+      );
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+    final likeRef = review.ref!.collection('likes').doc(user.uid);
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final likeSnap = await transaction.get(likeRef);
+      if (likeSnap.exists) {
+        transaction.delete(likeRef);
+        transaction.update(review.ref!, {
+          'likesCount': FieldValue.increment(-1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       } else {
-        review.likes++;
-        review.isLikedByMe = true;
+        transaction.set(likeRef, {
+          'userId': user.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        transaction.update(review.ref!, {
+          'likesCount': FieldValue.increment(1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       }
     });
-    HapticFeedback.selectionClick();
   }
 
   // ── Show add-review bottom sheet ─────────────────────────────────────────
-  void _showAddReviewSheet() {
+  void _showAddReviewSheet({BookReview? replyTo}) {
+    setState(() => _replyTarget = replyTo);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -194,45 +243,259 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         commentCtrl: _commentCtrl,
         focusNode: _focusNode,
         pendingStars: _pendingStars,
+        replyTargetName: replyTo?.authorName,
         onStarTap: (s) => setState(() => _pendingStars = s),
         onSubmit: _submitReview,
       ),
+    ).whenComplete(() {
+      if (mounted) setState(() => _replyTarget = null);
+    });
+  }
+
+  void _listenToBookComments() {
+    _commentsSub?.cancel();
+    setState(() {
+      _isReviewsLoading = true;
+      _reviewsError = null;
+      _reviews = const [];
+    });
+
+    _commentsSub = _commentsCollection
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) async {
+            try {
+              final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+              final reviews = await Future.wait(
+                snapshot.docs.map(
+                  (doc) => _reviewFromSnapshot(doc, currentUserId),
+                ),
+              );
+              if (!mounted) return;
+              setState(() {
+                _reviews = reviews;
+                _isReviewsLoading = false;
+                _reviewsError = null;
+              });
+            } catch (error) {
+              if (!mounted) return;
+              setState(() {
+                _isReviewsLoading = false;
+                _reviewsError = error.toString();
+              });
+            }
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _isReviewsLoading = false;
+              _reviewsError = error.toString();
+              _reviews = const [];
+            });
+          },
+        );
+  }
+
+  Future<BookReview> _reviewFromSnapshot(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    String? currentUserId,
+  ) async {
+    final data = doc.data();
+    final ref = doc.reference;
+    final repliesSnap = await ref
+        .collection('replies')
+        .orderBy('createdAt')
+        .get();
+    final replies = await Future.wait(
+      repliesSnap.docs.map(
+        (replyDoc) => _reviewFromSnapshot(replyDoc, currentUserId),
+      ),
     );
+
+    final likesSnap = await ref.collection('likes').get();
+    final isLikedByMe = currentUserId == null
+        ? false
+        : likesSnap.docs.any((doc) => doc.id == currentUserId);
+    final storedLikesCount = (data['likesCount'] as num?)?.round();
+
+    return BookReview(
+      id: doc.id,
+      userId: data['userId']?.toString() ?? '',
+      authorName: data['userName']?.toString().trim().isNotEmpty == true
+          ? data['userName'].toString()
+          : 'مستخدم كتب FM',
+      avatarUrl: data['userAvatar']?.toString() ?? '',
+      text: data['text']?.toString() ?? '',
+      rating: (data['rating'] as num?)?.round() ?? 0,
+      timeAgo: _timeAgo((data['createdAt'] as Timestamp?)?.toDate()),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      ref: ref,
+      replies: replies,
+      likes: storedLikesCount ?? likesSnap.size,
+      isLikedByMe: isLikedByMe,
+    );
+  }
+
+  String _currentUserName(AuthProvider auth) {
+    final appName = auth.appUser?.name.trim();
+    if (appName != null && appName.isNotEmpty) return appName;
+    final displayName = auth.user?.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    return 'مستخدم كتب FM';
+  }
+
+  String _currentUserAvatar(AuthProvider auth) {
+    final appAvatar = auth.appUser?.photoUrl?.trim();
+    if (appAvatar != null && appAvatar.isNotEmpty) return appAvatar;
+    final photoUrl = auth.user?.photoURL?.trim();
+    if (photoUrl != null && photoUrl.isNotEmpty) return photoUrl;
+    return '';
+  }
+
+  String _timeAgo(DateTime? dateTime) {
+    if (dateTime == null) return 'الآن';
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'الآن';
+    if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
+    if (diff.inHours < 24) return 'منذ ${diff.inHours} ساعة';
+    if (diff.inDays < 7) return 'منذ ${diff.inDays} يوم';
+    return 'منذ ${(diff.inDays / 7).floor()} أسبوع';
+  }
+
+  String _formatDuration(String durationStr) {
+    if (durationStr.isEmpty) return '';
+    final parts = durationStr.split(':');
+    if (parts.length == 2) {
+      final minutes = int.tryParse(parts[0]);
+      if (minutes != null) {
+        if (minutes == 1) return 'دقيقة واحدة';
+        if (minutes == 2) return 'دقيقتان';
+        if (minutes >= 3 && minutes <= 10) return '$minutes دقائق';
+        return '$minutes دقيقة';
+      }
+    } else if (parts.length == 3) {
+      final hours = int.tryParse(parts[0]);
+      final minutes = int.tryParse(parts[1]);
+      if (hours != null && minutes != null) {
+        String hoursStr = '';
+        if (hours == 1) {
+          hoursStr = 'ساعة';
+        } else if (hours == 2) {
+          hoursStr = 'ساعتان';
+        } else if (hours >= 3 && hours <= 10) {
+          hoursStr = '$hours ساعات';
+        } else {
+          hoursStr = '$hours ساعة';
+        }
+
+        if (minutes == 0) {
+          return hoursStr;
+        }
+
+        String minutesStr = '';
+        if (minutes == 1) {
+          minutesStr = 'دقيقة';
+        } else if (minutes == 2) {
+          minutesStr = 'دقيقتان';
+        } else if (minutes >= 3 && minutes <= 10) {
+          minutesStr = '$minutes دقائق';
+        } else {
+          minutesStr = '$minutes دقيقة';
+        }
+
+        return '$hoursStr و $minutesStr';
+      }
+    }
+    return durationStr;
   }
 
   // =========================================================================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _T.bg,
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildAppBar(),
-            _buildHeroSection(),
-            _buildActionButtons(),
-            _buildMetadataGrid(),
-            _buildQuoteCard(),
-            _buildSectionTitle('نبذة عن القصة'),
-            _buildDescription(),
-            _buildSectionTitle('عن المؤلف'),
-            _buildAuthorSection(),
-            _buildSectionTitle('كتب ذات صلة'),
-            _buildRelatedSection(),
-            _buildReviewsHeader(),
-            _buildReviewsList(),
-            _buildAddReviewButton(),
-            const SliverToBoxAdapter(child: SizedBox(height: 60)),
-          ],
-        ),
+    return ChangeNotifierProvider<BookDetailsViewModel>(
+      create: (_) => BookDetailsViewModel(
+        repository: BookDetailsRepositoryImpl(),
+        bookId: _targetBookId,
+      ),
+      child: Consumer<BookDetailsViewModel>(
+        builder: (context, viewModel, child) {
+          if (viewModel.isLoading) {
+            return const Scaffold(
+              backgroundColor: _T.bg,
+              body: Center(child: CircularProgressIndicator(color: _T.gold)),
+            );
+          }
+
+          if (viewModel.errorMessage != null) {
+            return Scaffold(
+              backgroundColor: _T.bg,
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      viewModel.errorMessage!,
+                      style: const TextStyle(color: Colors.white),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: viewModel.loadBookDetails,
+                      child: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final book = viewModel.book;
+          if (book == null) {
+            return const Scaffold(
+              backgroundColor: _T.bg,
+              body: Center(
+                child: Text(
+                  'لم يتم العثور على الكتاب',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: _T.bg,
+            body: Directionality(
+              textDirection: TextDirection.rtl,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  _buildAppBar(viewModel),
+                  _buildHeroSection(book),
+                  _buildMetadataGrid(book),
+                  if (book.shortQuote.isNotEmpty) _buildQuoteCard(book),
+                  _buildSectionTitle('نبذة عن القصة'),
+                  _buildDescription(book),
+                  _buildSectionTitle('عن المؤلف'),
+                  _buildAuthorSection(book),
+                  _buildSectionTitle('شباتر الكتاب'),
+                  _buildChaptersList(book),
+                  _buildRelatedSection(),
+                  _buildReviewsHeader(),
+                  _buildReviewsList(),
+                  _buildAddReviewButton(),
+                  const SliverToBoxAdapter(child: SizedBox(height: 60)),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   // ── APP BAR ──────────────────────────────────────────────────────────────
-  SliverAppBar _buildAppBar() => SliverAppBar(
+  SliverAppBar _buildAppBar(BookDetailsViewModel viewModel) => SliverAppBar(
     pinned: true,
     backgroundColor: _T.bg.withValues(alpha: 0.96),
     elevation: 0,
@@ -246,12 +509,24 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     ),
     actions: [
       IconButton(
-        icon: const Icon(
-          Icons.favorite_border_rounded,
-          color: Colors.white,
+        icon: Icon(
+          viewModel.isFavorite
+              ? Icons.favorite_rounded
+              : Icons.favorite_border_rounded,
+          color: viewModel.isFavorite ? _T.gold : Colors.white,
           size: 22,
         ),
-        onPressed: () => HapticFeedback.mediumImpact(),
+        onPressed: () {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null || user.isAnonymous) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('سجل الدخول لإضافة الكتاب إلى المفضلة')),
+            );
+            return;
+          }
+          HapticFeedback.mediumImpact();
+          viewModel.toggleFavorite();
+        },
       ),
       IconButton(
         icon: const Icon(Icons.share_outlined, color: Colors.white, size: 22),
@@ -261,7 +536,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   );
 
   // ── HERO ─────────────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildHeroSection() => SliverToBoxAdapter(
+  SliverToBoxAdapter _buildHeroSection(BookDetail book) => SliverToBoxAdapter(
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
@@ -289,7 +564,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: Image.network(
-                  BookMockData.coverUrl,
+                  book.imageUrl,
                   fit: BoxFit.cover,
                   loadingBuilder: (_, child, prog) => prog == null
                       ? child
@@ -312,10 +587,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ),
           ),
           const SizedBox(height: 32),
-          _goldBadge(BookMockData.category),
-          const SizedBox(height: 16),
+          if (book.category.isNotEmpty) ...[
+            _goldBadge(book.category),
+            const SizedBox(height: 16),
+          ],
           Text(
-            BookMockData.title,
+            book.title,
             textAlign: TextAlign.center,
             style: GoogleFonts.amiri(
               color: _T.gold,
@@ -326,7 +603,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            BookMockData.authorName,
+            book.author,
             style: GoogleFonts.amiri(
               color: _T.mute,
               fontSize: 18,
@@ -338,10 +615,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ..._starRow(_avgRating),
+              ..._starRow(book.rating.toDouble()),
               const SizedBox(width: 8),
               Text(
-                '${_avgRating.toStringAsFixed(1)} (${_reviews.length} تقييم)',
+                '${book.rating.toStringAsFixed(1)} (${_reviews.length} تقييم)',
                 style: const TextStyle(color: _T.mute, fontSize: 13),
               ),
             ],
@@ -351,49 +628,8 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     ),
   );
 
-  // ── ACTIONS ───────────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildActionButtons() => SliverToBoxAdapter(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: _BigButton(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.pushNamed(context, AppRoutes.audioPlayer);
-              },
-              icon: Icons.headset_rounded,
-              label: "استمع الآن",
-              primary: true,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _BigButton(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.bookReader,
-                  arguments: const BookReaderScreenArgs(
-                    pdfAssetPath: 'assets/transcript.json',
-                    bookTitle: BookMockData.title,
-                  ),
-                );
-              },
-              icon: Icons.menu_book_rounded,
-              label: "اقرأ الآن",
-              primary: false,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
   // ── METADATA GRID ─────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildMetadataGrid() => SliverToBoxAdapter(
+  SliverToBoxAdapter _buildMetadataGrid(BookDetail book) => SliverToBoxAdapter(
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Container(
@@ -405,21 +641,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _metaItem(Icons.star_rounded, BookMockData.rating, "تقييم"),
+            _metaItem(Icons.star_rounded, book.rating, "تقييم"),
             _vDivider(),
             _metaItem(
               Icons.access_time_filled_rounded,
-              BookMockData.duration,
+              _formatDuration(book.duration),
               "مدة",
             ),
             _vDivider(),
-            _metaItem(Icons.language_rounded, BookMockData.language, "لغة"),
+            _metaItem(Icons.language_rounded, book.language, "لغة"),
             _vDivider(),
-            _metaItem(
-              Icons.auto_stories_rounded,
-              "${BookMockData.pages}",
-              "صفحة",
-            ),
+            _metaItem(Icons.auto_stories_rounded, "${book.pages}", "صفحة"),
           ],
         ),
       ),
@@ -449,7 +681,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   );
 
   // ── QUOTE CARD ────────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildQuoteCard() => SliverToBoxAdapter(
+  SliverToBoxAdapter _buildQuoteCard(BookDetail book) => SliverToBoxAdapter(
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Container(
@@ -473,7 +705,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ),
             const SizedBox(height: 14),
             Text(
-              BookMockData.shortQuote,
+              book.shortQuote,
               textAlign: TextAlign.center,
               style: GoogleFonts.amiri(
                 color: _T.gold,
@@ -490,11 +722,11 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   );
 
   // ── DESCRIPTION ───────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildDescription() => SliverToBoxAdapter(
+  SliverToBoxAdapter _buildDescription(BookDetail book) => SliverToBoxAdapter(
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Text(
-        BookMockData.description,
+        book.description,
         style: GoogleFonts.amiri(
           color: _T.text.withValues(alpha: 0.8),
           fontSize: 17,
@@ -505,79 +737,184 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   );
 
   // ── AUTHOR SECTION ────────────────────────────────────────────────────────
-  SliverToBoxAdapter _buildAuthorSection() => SliverToBoxAdapter(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: _T.surf,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _T.gold.withValues(alpha: 0.2),
-                    border: Border.all(color: _T.gold.withValues(alpha: 0.3)),
-                  ),
-                  child: const Icon(Icons.person, color: _T.gold, size: 30),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        BookMockData.authorName,
-                        style: GoogleFonts.amiri(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        BookMockData.authorFullNameRussian,
-                        style: const TextStyle(color: _T.mute, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _authorRow(Icons.calendar_today_rounded, BookMockData.authorLife),
-            const SizedBox(height: 12),
-            _authorRow(
-              Icons.translate_rounded,
-              "المترجم: ${BookMockData.translator}",
-            ),
-            const SizedBox(height: 12),
-            _authorRow(
-              Icons.record_voice_over_rounded,
-              "بصوت: ${BookMockData.narrator}",
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+  SliverToBoxAdapter _buildAuthorSection(BookDetail book) {
+    final showRussianName = book.authorFullNameRussian.isNotEmpty;
+    final showLife = book.authorLife.isNotEmpty;
+    final showTranslator = book.translator.isNotEmpty;
+    final showNarrator = book.narrator.isNotEmpty;
+    final showPublisher = book.publisherName.isNotEmpty;
 
-  Widget _authorRow(IconData icon, String text) => Row(
-    children: [
-      Icon(icon, size: 16, color: _T.gold.withValues(alpha: 0.6)),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(text, style: const TextStyle(color: _T.mute, fontSize: 13)),
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _T.surf,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _T.gold.withValues(alpha: 0.2),
+                      border: Border.all(color: _T.gold.withValues(alpha: 0.3)),
+                    ),
+                    child: const Icon(Icons.person, color: _T.gold, size: 30),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _openCreatorDetails(
+                        id: book.authorId,
+                        name: book.author,
+                        roleLabel: 'المؤلف',
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  book.author,
+                                  style: GoogleFonts.amiri(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.chevron_left_rounded,
+                                color: _T.gold,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          if (showRussianName) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              book.authorFullNameRussian,
+                              style: const TextStyle(
+                                color: _T.mute,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (showLife ||
+                  showTranslator ||
+                  showNarrator ||
+                  showPublisher) ...[
+                const SizedBox(height: 24),
+                if (showLife) ...[
+                  _authorRow(Icons.calendar_today_rounded, book.authorLife),
+                  if (showTranslator || showNarrator || showPublisher)
+                    const SizedBox(height: 12),
+                ],
+                if (showTranslator) ...[
+                  _authorRow(
+                    Icons.translate_rounded,
+                    "المترجم: ${book.translator}",
+                    onTap: () => _openCreatorDetails(
+                      id: book.translatorId,
+                      name: book.translator,
+                      roleLabel: 'المترجم',
+                    ),
+                  ),
+                  if (showNarrator || showPublisher) const SizedBox(height: 12),
+                ],
+                if (showNarrator) ...[
+                  _authorRow(
+                    Icons.record_voice_over_rounded,
+                    "بصوت: ${book.narrator}",
+                    onTap: () => _openCreatorDetails(
+                      id: book.narratorId,
+                      name: book.narrator,
+                      roleLabel: 'القارئ',
+                    ),
+                  ),
+                  if (showPublisher) const SizedBox(height: 12),
+                ],
+                if (showPublisher) ...[
+                  _authorRow(
+                    Icons.business_rounded,
+                    "الناشر: ${book.publisherName}",
+                    onTap: () => _openCreatorDetails(
+                      id: book.publisherId,
+                      name: book.publisherName,
+                      roleLabel: 'الناشر',
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
       ),
-    ],
-  );
+    );
+  }
+
+  Widget _authorRow(IconData icon, String text, {VoidCallback? onTap}) {
+    final row = Row(
+      children: [
+        Icon(icon, size: 16, color: _T.gold.withValues(alpha: 0.6)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: _T.mute, fontSize: 13),
+          ),
+        ),
+        if (onTap != null)
+          const Icon(Icons.chevron_left_rounded, color: _T.gold, size: 16),
+      ],
+    );
+
+    if (onTap == null) return row;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: row,
+      ),
+    );
+  }
+
+  void _openCreatorDetails({
+    required String id,
+    required String name,
+    required String roleLabel,
+  }) {
+    final cleanName = name.trim();
+    final cleanId = id.trim();
+    if (cleanId.isEmpty && cleanName.isEmpty) return;
+
+    Navigator.pushNamed(
+      context,
+      AppRoutes.creatorDetails,
+      arguments: CreatorDetailsArgs(
+        creatorId: cleanId,
+        displayName: cleanName,
+        roleLabel: roleLabel,
+      ),
+    );
+  }
 
   // ── RELATED ───────────────────────────────────────────────────────────────
   SliverToBoxAdapter _buildRelatedSection() => SliverToBoxAdapter(
@@ -727,15 +1064,53 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   // ── REVIEWS LIST ──────────────────────────────────────────────────────────
-  SliverList _buildReviewsList() => SliverList(
-    delegate: SliverChildBuilderDelegate(
-      (ctx, i) => _ReviewCard(
-        review: _reviews[i],
-        onLike: () => _toggleLike(_reviews[i]),
+  Widget _buildReviewsList() {
+    if (_isReviewsLoading) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: Center(child: CircularProgressIndicator(color: _T.gold)),
+        ),
+      );
+    }
+
+    if (_reviewsError != null) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          child: Text(
+            'تعذر تحميل التعليقات',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _T.mute),
+          ),
+        ),
+      );
+    }
+
+    if (_reviews.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Text(
+            'لا توجد تعليقات بعد.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _T.mute),
+          ),
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (ctx, i) => _ReviewCard(
+          review: _reviews[i],
+          onLike: _toggleLike,
+          onReply: (review) => _showAddReviewSheet(replyTo: review),
+        ),
+        childCount: _reviews.length,
       ),
-      childCount: _reviews.length,
-    ),
-  );
+    );
+  }
 
   // ── ADD REVIEW BUTTON ─────────────────────────────────────────────────────
   SliverToBoxAdapter _buildAddReviewButton() => SliverToBoxAdapter(
@@ -821,6 +1196,209 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
       ),
     ),
   );
+
+  Widget _buildChaptersList(BookDetail book) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final chapter = book.chapters[index];
+          return _buildChapterListItem(context, book, chapter, index);
+        }, childCount: book.chapters.length),
+      ),
+    );
+  }
+
+  Widget _buildChapterListItem(
+    BuildContext context,
+    BookDetail book,
+    Chapter chapter,
+    int index,
+  ) {
+    final audioProvider = context.watch<AudioProvider>();
+    final isActive = audioProvider.isActiveChapter(chapter.id);
+    final isPlaying = isActive && audioProvider.isPlaying;
+
+    Future<void> onTapPlay() async {
+      HapticFeedback.lightImpact();
+      if (isActive) {
+        audioProvider.togglePlay();
+      } else {
+        await audioProvider.playChapterAudio(
+          bookId: book.id,
+          chapter: chapter,
+          chapters: book.chapters,
+          bookTitle: book.title,
+          bookCoverUrl: book.imageUrl,
+          author: book.author,
+        );
+      }
+    }
+
+    return GestureDetector(
+      onTap: onTapPlay,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _T.surf,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? _T.gold.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.05),
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Index/State icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? _T.gold
+                    : Colors.white.withValues(alpha: 0.06),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: isActive
+                    ? Icon(
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 24,
+                      )
+                    : Text(
+                        '${index + 1}',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Chapter info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    chapter.title,
+                    style: GoogleFonts.amiri(
+                      color: isActive ? _T.gold : Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 12,
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDuration(chapter.duration),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Dual Actions
+            Row(
+              children: [
+                // Listen button
+                _buildChapterActionButton(
+                  icon: isPlaying ? Icons.pause_rounded : Icons.headset_rounded,
+                  label: 'استمع',
+                  onTap: onTapPlay,
+                  isPrimary: true,
+                ),
+                const SizedBox(width: 8),
+                // Read button
+                _buildChapterActionButton(
+                  icon: Icons.menu_book_rounded,
+                  label: 'اقرأ',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.bookReader,
+                      arguments: BookReaderScreenArgs(
+                        pdfAssetPath: book.id,
+                        bookTitle: book.title,
+                        audioUrl: chapter.audioUrl,
+                        chapterId: chapter.id,
+                        transcript: chapter.transcript,
+                      ),
+                    );
+                  },
+                  isPrimary: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChapterActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required bool isPrimary,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isPrimary ? _T.gold : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isPrimary
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isPrimary ? Colors.black : Colors.white,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isPrimary ? Colors.black : Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -828,20 +1406,34 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 // ════════════════════════════════════════════════════════════════════════════
 class _ReviewCard extends StatelessWidget {
   final BookReview review;
-  final VoidCallback onLike;
+  final ValueChanged<BookReview> onLike;
+  final ValueChanged<BookReview> onReply;
+  final bool isReply;
 
-  const _ReviewCard({required this.review, required this.onLike});
+  const _ReviewCard({
+    required this.review,
+    required this.onLike,
+    required this.onReply,
+    this.isReply = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        padding: const EdgeInsets.all(20),
+        margin: EdgeInsets.only(
+          right: isReply ? 44 : 24,
+          left: 24,
+          top: isReply ? 4 : 8,
+          bottom: isReply ? 4 : 8,
+        ),
+        padding: EdgeInsets.all(isReply ? 16 : 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E),
-          borderRadius: BorderRadius.circular(20),
+          color: isReply
+              ? Colors.white.withValues(alpha: 0.035)
+              : const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(isReply ? 16 : 20),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
         child: Column(
@@ -851,9 +1443,18 @@ class _ReviewCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  radius: 22,
-                  backgroundImage: NetworkImage(review.avatarUrl),
+                  radius: isReply ? 18 : 22,
+                  backgroundImage: review.avatarUrl.isNotEmpty
+                      ? NetworkImage(review.avatarUrl)
+                      : null,
                   backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                  child: review.avatarUrl.isEmpty
+                      ? const Icon(
+                          Icons.person_rounded,
+                          color: AppTheme.primary,
+                          size: 18,
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -871,17 +1472,19 @@ class _ReviewCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          ...List.generate(
-                            5,
-                            (i) => Icon(
-                              i < review.rating
-                                  ? Icons.star_rounded
-                                  : Icons.star_outline_rounded,
-                              color: AppTheme.primary,
-                              size: 13,
+                          if (review.rating > 0) ...[
+                            ...List.generate(
+                              5,
+                              (i) => Icon(
+                                i < review.rating
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                color: AppTheme.primary,
+                                size: 13,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
+                            const SizedBox(width: 6),
+                          ],
                           Text(
                             review.timeAgo,
                             style: const TextStyle(
@@ -915,7 +1518,7 @@ class _ReviewCard extends StatelessWidget {
             Row(
               children: [
                 GestureDetector(
-                  onTap: onLike,
+                  onTap: () => onLike(review),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
@@ -958,8 +1561,30 @@ class _ReviewCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (!isReply) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () => onReply(review),
+                    icon: const Icon(Icons.reply_rounded, size: 16),
+                    label: const Text('رد'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.onSurfaceVariant,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
               ],
             ),
+            if (review.replies.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final reply in review.replies)
+                _ReviewCard(
+                  review: reply,
+                  onLike: onLike,
+                  onReply: onReply,
+                  isReply: true,
+                ),
+            ],
           ],
         ),
       ),
@@ -974,6 +1599,7 @@ class _AddReviewSheet extends StatefulWidget {
   final TextEditingController commentCtrl;
   final FocusNode focusNode;
   final int pendingStars;
+  final String? replyTargetName;
   final ValueChanged<int> onStarTap;
   final VoidCallback onSubmit;
 
@@ -981,6 +1607,7 @@ class _AddReviewSheet extends StatefulWidget {
     required this.commentCtrl,
     required this.focusNode,
     required this.pendingStars,
+    this.replyTargetName,
     required this.onStarTap,
     required this.onSubmit,
   });
@@ -1030,7 +1657,9 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               ),
 
               Text(
-                'أضف تقييمك',
+                widget.replyTargetName == null
+                    ? 'أضف تقييمك'
+                    : 'رد على ${widget.replyTargetName}',
                 style: GoogleFonts.amiri(
                   color: Colors.white,
                   fontSize: 22,
@@ -1040,35 +1669,36 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               const SizedBox(height: 20),
 
               // Star selector
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  final star = i + 1;
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _stars = star);
-                      widget.onStarTap(star);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Icon(
-                          star <= _stars
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
-                          key: ValueKey('$star-${star <= _stars}'),
-                          color: AppTheme.primary,
-                          size: 38,
+              if (widget.replyTargetName == null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final star = i + 1;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _stars = star);
+                        widget.onStarTap(star);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: Icon(
+                            star <= _stars
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            key: ValueKey('$star-${star <= _stars}'),
+                            color: AppTheme.primary,
+                            size: 38,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              ),
-
-              const SizedBox(height: 20),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Text field
               TextField(
@@ -1078,7 +1708,9 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                 minLines: 3,
                 style: GoogleFonts.amiri(color: Colors.white, fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: 'اكتب تعليقك هنا...',
+                  hintText: widget.replyTargetName == null
+                      ? 'اكتب تعليقك هنا...'
+                      : 'اكتب ردك هنا...',
                   hintStyle: const TextStyle(color: Colors.white24),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.06),
@@ -1117,61 +1749,6 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               const SizedBox(height: 8),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// PRIMARY ACTION BUTTON
-// ════════════════════════════════════════════════════════════════════════════
-class _BigButton extends StatelessWidget {
-  final VoidCallback onTap;
-  final IconData icon;
-  final String label;
-  final bool primary;
-
-  const _BigButton({
-    required this.onTap,
-    required this.icon,
-    required this.label,
-    required this.primary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 64,
-        decoration: BoxDecoration(
-          color: primary ? AppTheme.primary : Colors.white12,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: primary
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: primary ? Colors.black : Colors.white, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: primary ? Colors.black : Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ],
         ),
       ),
     );

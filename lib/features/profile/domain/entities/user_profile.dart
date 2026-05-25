@@ -13,6 +13,7 @@ class UserProfile {
   final int followingCount;
   final List<ContinueListeningItem> continueListening;
   final List<int> weeklyActivityMinutes; // 7 values, Mon-Sun
+  final List<UserAchievement> achievements;
 
   const UserProfile({
     required this.id,
@@ -28,6 +29,7 @@ class UserProfile {
     this.followingCount = 0,
     this.continueListening = const [],
     this.weeklyActivityMinutes = const [0, 0, 0, 0, 0, 0, 0],
+    this.achievements = const [],
   });
 
   String get totalListeningHours {
@@ -41,6 +43,14 @@ class UserProfile {
     String? avatarUrl,
     String? bio,
     List<String>? favoriteCategories,
+    int? totalBooksListened,
+    int? totalListeningMinutes,
+    int? favoritesCount,
+    int? followersCount,
+    int? followingCount,
+    List<ContinueListeningItem>? continueListening,
+    List<int>? weeklyActivityMinutes,
+    List<UserAchievement>? achievements,
   }) {
     return UserProfile(
       id: id,
@@ -49,14 +59,48 @@ class UserProfile {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       bio: bio ?? this.bio,
       favoriteCategories: favoriteCategories ?? this.favoriteCategories,
-      totalBooksListened: totalBooksListened,
-      totalListeningMinutes: totalListeningMinutes,
-      favoritesCount: favoritesCount,
-      followersCount: followersCount,
-      followingCount: followingCount,
-      continueListening: continueListening,
-      weeklyActivityMinutes: weeklyActivityMinutes,
+      totalBooksListened: totalBooksListened ?? this.totalBooksListened,
+      totalListeningMinutes: totalListeningMinutes ?? this.totalListeningMinutes,
+      favoritesCount: favoritesCount ?? this.favoritesCount,
+      followersCount: followersCount ?? this.followersCount,
+      followingCount: followingCount ?? this.followingCount,
+      continueListening: continueListening ?? this.continueListening,
+      weeklyActivityMinutes: weeklyActivityMinutes ?? this.weeklyActivityMinutes,
+      achievements: achievements ?? this.achievements,
     );
+  }
+}
+
+/// Represents a badge/achievement earned by the user.
+class UserAchievement {
+  final String icon;
+  final String title;
+  final String desc;
+  final bool unlocked;
+
+  const UserAchievement({
+    required this.icon,
+    required this.title,
+    required this.desc,
+    this.unlocked = false,
+  });
+
+  factory UserAchievement.fromMap(Map<String, dynamic> map) {
+    return UserAchievement(
+      icon: map['icon'] ?? '',
+      title: map['title'] ?? '',
+      desc: map['desc'] ?? '',
+      unlocked: map['unlocked'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'icon': icon,
+      'title': title,
+      'desc': desc,
+      'unlocked': unlocked,
+    };
   }
 }
 

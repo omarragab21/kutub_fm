@@ -7,7 +7,7 @@ import '../widgets/radio_ambient_background.dart';
 import '../widgets/fm_station_list_tile.dart';
 import '../provider/fm_radio_provider.dart';
 
-/// FM stations directory mapped to an API
+/// FM stations directory backed by Firebase.
 class FMRadioScreen extends StatelessWidget {
   const FMRadioScreen({super.key});
 
@@ -292,6 +292,57 @@ Widget _buildFilterToggle(FmRadioProvider provider) {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
     ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: const []),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _FilterChipButton(
+          label: 'الكل',
+          selected: !provider.isQuranOnly,
+          onTap: () => provider.setQuranFilter(false),
+        ),
+        _FilterChipButton(
+          label: 'قرآن',
+          selected: provider.isQuranOnly,
+          onTap: () => provider.setQuranFilter(true),
+        ),
+      ],
+    ),
   );
+}
+
+class _FilterChipButton extends StatelessWidget {
+  const _FilterChipButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFF2CA50)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: selected ? const Color(0xFF111217) : Colors.white70,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
 }
