@@ -21,6 +21,7 @@ import '../../features/reader_sessions/presentation/pages/reader_post_detail_scr
 import '../../features/reader_sessions/presentation/pages/reader_sessions_screen.dart';
 import '../../features/podcast/presentation/pages/podcast_list_page.dart';
 import '../../features/podcast/presentation/pages/podcast_detail_page.dart';
+import '../../features/reels/presentation/pages/reel_preview_page.dart';
 
 import 'package:provider/provider.dart';
 import '../../features/profile/presentation/pages/settings_screen.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static const String phoneLogin = '/phone-login';
   static const String otpVerification = '/otp-verification';
   static const String search = '/search';
+  static const String reelPreview = '/reel_preview';
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -148,6 +150,7 @@ class AppRoutes {
             audioUrl: arg.audioUrl,
             chapterId: arg.chapterId,
             transcript: arg.transcript,
+            bookCoverUrl: arg.bookCoverUrl,
           ),
         );
       case audioPlayer:
@@ -241,6 +244,19 @@ class AppRoutes {
             );
           },
           transitionDuration: const Duration(milliseconds: 420),
+        );
+      case reelPreview:
+        final arg = routeSettings.arguments;
+        if (arg is! ReelPreviewArgs) {
+          return MaterialPageRoute(
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('بيانات المقطع غير صالحة')),
+            ),
+          );
+        }
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => ReelPreviewPage(args: arg),
         );
       default:
         return MaterialPageRoute(

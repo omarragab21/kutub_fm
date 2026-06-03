@@ -13,6 +13,9 @@ import '../../../../core/audio/audio_models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/transcript_segment.dart';
 import 'package:kutub_fm/features/book_reader/data/services/transcription_api_service.dart';
+import 'package:kutub_fm/features/reels/data/services/reel_api_service.dart';
+import 'package:kutub_fm/features/reels/presentation/pages/reel_preview_page.dart';
+import 'package:kutub_fm/core/routes/app_routes.dart';
 import 'package:dio/dio.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -47,6 +50,7 @@ class BookReaderScreen extends StatefulWidget {
   final String? audioUrl;
   final String? chapterId;
   final String? transcript;
+  final String? bookCoverUrl;
 
   const BookReaderScreen({
     super.key,
@@ -55,6 +59,7 @@ class BookReaderScreen extends StatefulWidget {
     this.audioUrl,
     this.chapterId,
     this.transcript,
+    this.bookCoverUrl,
   });
 
   @override
@@ -68,6 +73,7 @@ class BookReaderScreenArgs {
     this.audioUrl,
     this.chapterId,
     this.transcript,
+    this.bookCoverUrl,
   });
 
   final String pdfAssetPath;
@@ -75,6 +81,7 @@ class BookReaderScreenArgs {
   final String? audioUrl;
   final String? chapterId;
   final String? transcript;
+  final String? bookCoverUrl;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -92,6 +99,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   String _loadingMessage = 'جاري تهيئة الكتاب…';
   String? _error;
   String? _resolvedAudioUrl;
+  String? _bookCoverUrl;
   int _activeIndex = -1;
   final List<GlobalKey> _segmentKeys = [];
   bool _isRequestInProgress = false;
@@ -115,6 +123,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void initState() {
     super.initState();
+    _bookCoverUrl = widget.bookCoverUrl;
     _fadeIn = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -213,6 +222,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           .doc(widget.pdfAssetPath)
           .get();
       final bookData = bookDoc.data() ?? {};
+      final resolvedCoverUrl = bookData['imageUrl'] as String? ?? widget.bookCoverUrl;
+      if (mounted) {
+        setState(() {
+          _bookCoverUrl = resolvedCoverUrl;
+        });
+      }
 
       // Parse metadata
       final bookTitle = bookData['title'] as String? ?? widget.bookTitle;
@@ -407,27 +422,28 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
-  void _playSegmentOnly(int idx) {
-    final audioProvider = context.read<AudioProvider>();
-    final seg = _doc?.segments[idx];
-    if (seg == null) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _isSingleSegmentPlaying = true;
-      _singleSegmentEndTime = seg.end;
-      _controlsVisible = true;
-    });
-    unawaited(
-      audioProvider.playReadingAudio(
-        bookId: _readingBookId,
-        title: widget.bookTitle,
-        chapterId: widget.chapterId,
-        audioUrl: _effectiveAudioUrl,
-        autoplay: true,
-        initialPosition: Duration(milliseconds: (seg.start * 1000).round()),
-      ),
-    );
-  }
+  // _playSegmentOnly is no longer used since we now launch the bottom sheet instead of playing the segment only.
+  // void _playSegmentOnly(int idx) {
+  //   final audioProvider = context.read<AudioProvider>();
+  //   final seg = _doc?.segments[idx];
+  //   if (seg == null) return;
+  //   HapticFeedback.selectionClick();
+  //   setState(() {
+  //     _isSingleSegmentPlaying = true;
+  //     _singleSegmentEndTime = seg.end;
+  //     _controlsVisible = true;
+  //   });
+  //   unawaited(
+  //     audioProvider.playReadingAudio(
+  //       bookId: _readingBookId,
+  //       title: widget.bookTitle,
+  //       chapterId: widget.chapterId,
+  //       audioUrl: _effectiveAudioUrl,
+  //       autoplay: true,
+  //       initialPosition: Duration(milliseconds: (seg.start * 1000).round()),
+  //     ),
+  //   );
+  // }
 
   void _skip(int delta, Duration position, Duration duration) {
     final next = position + Duration(seconds: delta);
@@ -912,7 +928,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return GestureDetector(
       key: _segmentKeys[index],
       onTap: () => _seekBySegment(index),
-      onDoubleTap: () => _playSegmentOnly(index),
+      onDoubleTap: () => _showCreateReelBottomSheet(seg),
+      onLongPress: () => _showCreateReelBottomSheet(seg),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
@@ -1266,6 +1283,396 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ),
       ),
     );
+  }
+
+  void _showCreateReelBottomSheet(TranscriptSegment seg) {
+    HapticFeedback.mediumImpact();
+    
+    // Pause any playing audio first to prevent overlap
+    final audioProvider = context.read<AudioProvider>();
+    if (audioProvider.isPlaying) {
+      audioProvider.pause();
+    }
+
+    String selectedType = 'quote'; // Default dropdown type
+    final startTimeStr = _formatSegmentTime(seg.start);
+    final endTimeStr = _formatSegmentTime(seg.end);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Container(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                  left: 24,
+                  right: 24,
+                  top: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: _BookTheme.cardBg,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  border: Border(
+                    top: BorderSide(color: _BookTheme.dividerColor, width: 1),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle line
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: _BookTheme.dividerColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.video_library_rounded,
+                          color: _BookTheme.accent,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'توليد مقطع ريلز',
+                          style: GoogleFonts.amiri(
+                            color: _BookTheme.titleColor,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Selected segment text
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _BookTheme.pageBg.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _BookTheme.dividerColor),
+                      ),
+                      child: Text(
+                        seg.text,
+                        style: GoogleFonts.amiri(
+                          color: _BookTheme.bodyColor,
+                          fontSize: 16,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Info row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.timer_outlined,
+                              color: _BookTheme.labelColor,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'البداية: $startTimeStr',
+                              style: const TextStyle(
+                                color: _BookTheme.metaColor,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.timer_outlined,
+                              color: _BookTheme.labelColor,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'النهاية: $endTimeStr',
+                              style: const TextStyle(
+                                color: _BookTheme.metaColor,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Dropdown for type selection
+                    const Text(
+                      'تصنيف المقطع:',
+                      style: TextStyle(
+                        color: _BookTheme.labelColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: _BookTheme.pageBg.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _BookTheme.dividerColor),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedType,
+                          dropdownColor: _BookTheme.cardBg,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _BookTheme.accent),
+                          isExpanded: true,
+                          style: GoogleFonts.amiri(color: Colors.white, fontSize: 15),
+                          onChanged: (String? value) {
+                            if (value != null) {
+                              setModalState(() {
+                                selectedType = value;
+                              });
+                            }
+                          },
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'quote',
+                              child: Text('اقتباس (Quote)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'philosophy',
+                              child: Text('فلسفة (Philosophy)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'scan',
+                              child: Text('مسح ضوئي (Scan)'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _processReelCreation(seg, selectedType, startTimeStr, endTimeStr);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _BookTheme.accent,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'إنشاء ريلز',
+                          style: GoogleFonts.amiri(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatSegmentTime(double seconds) {
+    final totalSeconds = seconds.round();
+    final minutes = totalSeconds ~/ 60;
+    final remainingSeconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _processReelCreation(
+    TranscriptSegment seg,
+    String type,
+    String startStr,
+    String endStr,
+  ) async {
+    final audioUrl = _effectiveAudioUrl;
+    final coverUrl = _bookCoverUrl;
+    
+    // Check for missing data
+    if (audioUrl == null || audioUrl.isEmpty) {
+      _showErrorSnackBar('تعذر إنشاء مقطع الريل: رابط الملف الصوتي الخاص بالكتاب غير متوفر.');
+      return;
+    }
+    if (coverUrl == null || coverUrl.isEmpty) {
+      _showErrorSnackBar('تعذر إنشاء مقطع الريل: رابط غلاف الكتاب غير متوفر.');
+      return;
+    }
+    if (seg.start == 0.0 && seg.end == 0.0) {
+      _showErrorSnackBar('تعذر إنشاء مقطع الريل: الجملة المحددة لا تحتوي على طوابع زمنية.');
+      return;
+    }
+
+    // Show loading indicator dialog
+    String currentProgressMessage = 'جاري طلب إنشاء مقطع الريل من الخادم…';
+    bool isCompleted = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Keep dynamic update of dialog text
+            if (isCompleted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pop();
+              });
+            }
+            return PopScope(
+              canPop: false,
+              child: Dialog(
+                backgroundColor: _BookTheme.cardBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: _BookTheme.dividerColor, width: 1),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(28.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: _BookTheme.accent),
+                      const SizedBox(height: 24),
+                      Text(
+                        currentProgressMessage,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.amiri(
+                          color: _BookTheme.titleColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'قد تستغرق هذه العملية ما يصل إلى دقيقة واحدة، يرجى عدم إغلاق التطبيق.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _BookTheme.bodyMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final reelService = ReelApiService();
+    try {
+      // 1. Create Reel via API
+      final createResponse = await reelService.createReel(
+        audioUrl: audioUrl,
+        coverUrl: coverUrl,
+        start: startStr,
+        end: endStr,
+      );
+
+      final downloadUrl = createResponse['download_url']?.toString();
+      final outputFile = createResponse['output_file']?.toString();
+
+      if (downloadUrl == null || downloadUrl.isEmpty || outputFile == null || outputFile.isEmpty) {
+        throw Exception('الاستجابة المستلمة من الخادم لا تحتوي على معلومات التحميل.');
+      }
+
+      // Update loading dialog state
+      currentProgressMessage = 'تم إنشاء المقطع بنجاح! جاري تحميل ملف الفيديو…';
+      if (mounted) setState(() {});
+
+      // 2. Download generated video file
+      final localFilePath = await reelService.downloadReel(downloadUrl, outputFile);
+
+      // Fetch dynamic logo url configured in remote config
+      final logoUrl = await reelService.getLogoUrl();
+
+      // Dismiss dialog
+      isCompleted = true;
+      if (mounted) setState(() {});
+
+      // 3. Navigate to preview screen
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.reelPreview,
+          arguments: ReelPreviewArgs(
+            videoPath: localFilePath,
+            sentenceText: seg.text,
+            start: startStr,
+            end: endStr,
+            audioUrl: audioUrl,
+            coverUrl: coverUrl,
+            logoUrl: logoUrl,
+            downloadUrl: downloadUrl,
+            type: type,
+          ),
+        );
+      }
+    } catch (e) {
+      log('Error during reel generation/download process: $e');
+      // Dismiss dialog
+      isCompleted = true;
+      if (mounted) setState(() {});
+
+      // Extract a helpful error message
+      String friendlyError = e.toString();
+      if (friendlyError.startsWith('Exception: ')) {
+        friendlyError = friendlyError.substring(10);
+      }
+      _showErrorSnackBar('فشل إنشاء مقطع الريل: $friendlyError');
+    }
+  }
+
+  void _showErrorSnackBar(String errorMsg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMsg,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────

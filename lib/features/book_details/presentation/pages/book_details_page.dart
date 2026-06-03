@@ -1344,6 +1344,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                         audioUrl: chapter.audioUrl,
                         chapterId: chapter.id,
                         transcript: chapter.transcript,
+                        bookCoverUrl: book.imageUrl,
                       ),
                     );
                   },

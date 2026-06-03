@@ -44,6 +44,7 @@ class AudioNavigationHelper {
         final chapterId = audioProvider.currentReadingChapterId;
         final bookTitle = audioProvider.currentReadingBookTitle;
         final audioUrl = audioProvider.currentReadingBookAudioUrl;
+        final bookCoverUrl = audioProvider.currentTrack?.artUri;
         if (bookId == null || bookTitle == null) return null;
         return _AudioNavigationDestination(
           routeName: AppRoutes.bookReader,
@@ -52,6 +53,7 @@ class AudioNavigationHelper {
             bookTitle: bookTitle,
             audioUrl: audioUrl,
             chapterId: chapterId,
+            bookCoverUrl: bookCoverUrl,
           ),
         );
       case AudioMode.podcast:
