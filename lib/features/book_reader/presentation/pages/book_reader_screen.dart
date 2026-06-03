@@ -1641,6 +1641,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             logoUrl: logoUrl,
             downloadUrl: downloadUrl,
             type: type,
+            bookTitle: _doc?.metadata.title ?? widget.bookTitle,
+            author: _doc?.metadata.author ?? 'غير معروف',
           ),
         );
       }

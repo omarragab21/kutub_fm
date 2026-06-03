@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_theme.dart';
+import 'reels_feed_page.dart';
 
 class ReelPreviewArgs {
   final String videoPath;
@@ -20,6 +21,8 @@ class ReelPreviewArgs {
   final String logoUrl;
   final String downloadUrl;
   final String type;
+  final String bookTitle;
+  final String author;
 
   const ReelPreviewArgs({
     required this.videoPath,
@@ -31,6 +34,8 @@ class ReelPreviewArgs {
     required this.logoUrl,
     required this.downloadUrl,
     required this.type,
+    this.bookTitle = '',
+    this.author = '',
   });
 }
 
@@ -53,12 +58,20 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
   bool _isSavingToCreations = false;
   bool _isSavingToGallery = false;
   bool _showPlayOverlay = false;
+  bool _isPublishing = false;
+  late TextEditingController _titleController;
+  late TextEditingController _descController;
 
   @override
   void initState() {
     super.initState();
+    _titleController = TextEditingController(text: widget.args.bookTitle);
+    _descController = TextEditingController(text: widget.args.sentenceText);
     _initializePlayer();
     _checkIfSavedInCreations();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _saveToGallery();
+    });
   }
 
   Future<void> _initializePlayer() async {
@@ -254,6 +267,271 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
     }
   }
 
+  Future<void> _publishAsReel() async {
+    HapticFeedback.mediumImpact();
+    
+    // Pause video player during publishing input
+    if (_isInitialized && _videoController.value.isPlaying) {
+      _videoController.pause();
+      setState(() {
+        _showPlayOverlay = true;
+      });
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Container(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                  left: 24,
+                  right: 24,
+                  top: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  border: Border(
+                    top: BorderSide(color: Colors.white12, width: 1),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.publish_rounded,
+                          color: AppTheme.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'نشر كـ مقطع ريلز',
+                          style: GoogleFonts.amiri(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Title input field
+                    const Text(
+                      'عنوان مقطع الريل (اسم الكتاب):',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _titleController,
+                      style: GoogleFonts.amiri(color: Colors.white, fontSize: 16),
+                      textDirection: TextDirection.rtl,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        hintText: 'أدخل عنوان الكتاب...',
+                        hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Colors.white10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Description input field
+                    const Text(
+                      'الوصف / الاقتباس:',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _descController,
+                      maxLines: 4,
+                      style: GoogleFonts.amiri(color: Colors.white, fontSize: 16, height: 1.4),
+                      textDirection: TextDirection.rtl,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        hintText: 'أكتب اقتباساً أو وصفاً للمقطع...',
+                        hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Colors.white10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Publish Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isPublishing
+                            ? null
+                            : () async {
+                                final navigator = Navigator.of(context);
+                                final messenger = ScaffoldMessenger.of(context);
+
+                                final title = _titleController.text.trim();
+                                final desc = _descController.text.trim();
+                                if (title.isEmpty) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('عنوان مقطع الريل مطلوب.'),
+                                      backgroundColor: Colors.amber,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setModalState(() {
+                                  _isPublishing = true;
+                                });
+
+                                try {
+                                  final docData = {
+                                    'bookTitle': title,
+                                    'author': widget.args.author.isNotEmpty
+                                        ? widget.args.author
+                                        : 'كاتب كتب FM',
+                                    'quote': desc,
+                                    'imageUrl': widget.args.coverUrl,
+                                    'videoUrl': widget.args.downloadUrl,
+                                    'likes': 0,
+                                    'comments': 0,
+                                    'shares': 0,
+                                    'categoryName': widget.args.type == 'quote'
+                                        ? 'اقتباس'
+                                        : widget.args.type == 'philosophy'
+                                            ? 'فلسفة'
+                                            : 'قراءة',
+                                    'createdAt': FieldValue.serverTimestamp(),
+                                  };
+
+                                  await FirebaseFirestore.instance
+                                      .collection('reels')
+                                      .add(docData);
+
+                                  if (mounted) {
+                                    // Close modal sheet
+                                    navigator.pop();
+                                    
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('تم نشر مقطع الريل بنجاح! 🚀🎬'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+
+                                    // Pop back to home (root) and push the Reels feed
+                                    navigator.popUntil((route) => route.isFirst);
+                                    navigator.push(
+                                      MaterialPageRoute(builder: (context) => const ReelsFeedPage()),
+                                    );
+                                  }
+                                } catch (e) {
+                                  log('Error publishing reel: $e');
+                                  if (mounted) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('فشل نشر مقطع الريل: $e'),
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  setModalState(() {
+                                    _isPublishing = false;
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isPublishing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : Text(
+                                'نشر الآن',
+                                style: GoogleFonts.amiri(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      // Resume playing if closed without publishing and video is not playing
+      if (mounted && _isInitialized && !_videoController.value.isPlaying && !_isPublishing) {
+        _videoController.play();
+        setState(() {
+          _showPlayOverlay = false;
+        });
+      }
+    });
+  }
+
   void _togglePlayPause() {
     if (!_isInitialized) return;
     setState(() {
@@ -269,6 +547,8 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
 
   @override
   void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
     if (_isInitialized) {
       _videoController.dispose();
     }
@@ -469,7 +749,17 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                     
                     const SizedBox(height: 24),
 
-                    // Actions Row (Share, Save to Gallery, Add to Creations)
+                    // Primary Publish button
+                    _buildActionButton(
+                      icon: Icons.publish_rounded,
+                      label: 'نشر كـ مقطع ريلز',
+                      onTap: _publishAsReel,
+                      isLoading: _isPublishing,
+                      isSecondary: false,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Actions Row (Share, Save to Gallery)
                     Row(
                       children: [
                         // Share Button
@@ -498,13 +788,13 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Creations Button (Full width for emphasis)
+                    // Creations Button (Full width, secondary style)
                     _buildActionButton(
                       icon: _hasSavedToCreations ? Icons.bookmark_added_rounded : Icons.bookmark_add_outlined,
                       label: _hasSavedToCreations ? 'تمت الإضافة إلى إبداعاتي' : 'إضافة إلى إبداعاتي',
                       onTap: _addToCreations,
                       isLoading: _isSavingToCreations,
-                      isSecondary: false,
+                      isSecondary: true,
                       isCompleted: _hasSavedToCreations,
                     ),
                   ],
