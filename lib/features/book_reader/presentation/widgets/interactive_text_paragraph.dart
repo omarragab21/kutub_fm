@@ -1,6 +1,5 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/reader_sentence.dart';
 
@@ -45,7 +44,7 @@ class InteractiveTextParagraph extends StatelessWidget {
                 
                 return TextSpan(
                   text: '${sentence.text} ',
-                  style: GoogleFonts.amiri(
+                  style: TextStyle(
                     color: isSelected ? Colors.white : AppTheme.primary.withOpacity(0.9),
                     fontSize: 22,
                     height: 1.8, // Comfortable reading height

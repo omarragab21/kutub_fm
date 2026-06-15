@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/transcript_segment.dart';
 
@@ -49,14 +48,12 @@ class RichTranscriptView extends StatelessWidget {
 
     // Apply specific fonts
     if (isArabic) {
-      style = GoogleFonts.amiri(
-        textStyle: style,
+      style = style.copyWith(
         fontSize: segment.type == TranscriptSegmentType.heading ? 28 : 22,
         fontWeight: segment.type == TranscriptSegmentType.heading ? FontWeight.bold : FontWeight.normal,
       );
     } else {
-      style = GoogleFonts.manrope(
-        textStyle: style,
+      style = style.copyWith(
         fontSize: segment.type == TranscriptSegmentType.heading ? 24 : 18,
         fontWeight: segment.type == TranscriptSegmentType.heading ? FontWeight.bold : FontWeight.normal,
       );

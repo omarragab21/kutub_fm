@@ -96,7 +96,9 @@ class KutubFmApp extends StatelessWidget {
     return MaterialApp(
       title: 'كتب FM',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
       navigatorKey: AppNavigationService.navigatorKey,
       initialRoute: AppRoutes.splash,
       onGenerateRoute: AppRoutes.generateRoute,

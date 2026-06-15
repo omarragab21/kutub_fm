@@ -15,9 +15,10 @@ class AppTheme {
   static const Color onSurfaceVariant = Color(0xD0D0C5AF);
 
   static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
+    final baseTheme = ThemeData(
       brightness: Brightness.dark,
+    );
+    return baseTheme.copyWith(
       scaffoldBackgroundColor: background,
       colorScheme: const ColorScheme.dark(
         primary: primary,
@@ -29,23 +30,35 @@ class AppTheme {
         onSurfaceVariant: onSurfaceVariant,
         surfaceContainerHighest: surfaceContainerHighest,
       ),
-      textTheme: TextTheme(
-        displayLarge: GoogleFonts.amiri(
-          fontSize: 48,
-          fontWeight: FontWeight.bold,
-          color: primary,
-          height: 1.2,
-        ),
-        bodyLarge: GoogleFonts.manrope(
-          color: onSurface,
-        ),
-        bodyMedium: GoogleFonts.manrope(
-          color: onSurfaceVariant,
-        ),
-        labelSmall: GoogleFonts.manrope(
-          color: onSurfaceVariant,
+      textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme).copyWith(
+        displayLarge: GoogleFonts.cairo(
+          textStyle: baseTheme.textTheme.displayLarge?.copyWith(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: primary,
+            height: 1.2,
+          ),
         ),
       ),
+    );
+  }
+
+  static ThemeData get lightTheme {
+    final baseTheme = ThemeData(
+      brightness: Brightness.light,
+    );
+    return baseTheme.copyWith(
+      scaffoldBackgroundColor: const Color(0xFFF9F9F9),
+      colorScheme: const ColorScheme.light(
+        primary: primary,
+        primaryContainer: primaryContainer,
+        onPrimary: onPrimary,
+        background: const Color(0xFFF9F9F9),
+        surface: Colors.white,
+        onSurface: const Color(0xFF131313),
+        onSurfaceVariant: const Color(0xFF757575),
+      ),
+      textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme),
     );
   }
 }

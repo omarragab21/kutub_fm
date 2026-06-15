@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kutub_fm/features/subscription/domain/entities/payment_method.dart';
 
 class PaymentMethodCard extends StatelessWidget {
@@ -136,7 +135,7 @@ class PaymentMethodCard extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,

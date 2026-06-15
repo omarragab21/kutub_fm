@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../../domain/entities/user_profile.dart';
 
 /// Animated avatar with a glowing golden gradient border.
@@ -161,7 +162,12 @@ class StatsWidget extends StatelessWidget {
           _buildDivider(),
           _buildStat(Icons.access_time_rounded, listeningTimeStr, 'مدة الاستماع'),
           _buildDivider(),
-          _buildStat(Icons.favorite_rounded, profile.favoritesCount.toString(), 'مفضلة'),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).pushNamed(AppRoutes.library);
+            },
+            child: _buildStat(Icons.favorite_rounded, profile.favoritesCount.toString(), 'مفضلة'),
+          ),
         ],
       ),
     );

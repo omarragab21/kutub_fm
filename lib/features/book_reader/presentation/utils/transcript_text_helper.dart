@@ -18,18 +18,11 @@ class TranscriptTextHelper {
         height: 1.6,
       );
 
-      // Apply Font Based on Language
-      if (isArabic) {
-        style = GoogleFonts.amiri(textStyle: style);
-      } else {
-        style = GoogleFonts.manrope(textStyle: style);
-      }
-
       // Apply Active Highlighting or Base Color
       if (isActive) {
         style = style.copyWith(
           color: AppTheme.primary,
-          backgroundColor: AppTheme.primary.withOpacity(0.2), // Mock visual sync
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.2), // Mock visual sync
         );
       } else {
         style = style.copyWith(

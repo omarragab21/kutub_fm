@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/widgets/subscription_card.dart';
@@ -17,7 +16,7 @@ class SubscriptionScreen extends StatelessWidget {
         elevation: 0,
         title: Text(
           'باقات الاشتراك',
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             color: const Color(0xFFD4AF37),
             fontWeight: FontWeight.bold,
           ),
@@ -37,7 +36,7 @@ class SubscriptionScreen extends StatelessWidget {
             return Center(
               child: Text(
                 'لا توجد باقات متاحة حالياً',
-                style: GoogleFonts.cairo(color: Colors.white),
+                style: TextStyle(color: Colors.white),
               ),
             );
           }
@@ -89,7 +88,7 @@ class SubscriptionScreen extends StatelessWidget {
                     ),
                     child: Text(
                       'المتابعة',
-                      style: GoogleFonts.cairo(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),

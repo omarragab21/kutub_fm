@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../providers/reader_sessions_provider.dart';
-import '../widgets/active_users_bar.dart';
 import '../widgets/post_card.dart';
 import 'reader_post_detail_screen.dart';
 
@@ -16,38 +14,55 @@ class ReaderSessionsScreen extends StatefulWidget {
 }
 
 class _ReaderSessionsScreenState extends State<ReaderSessionsScreen> {
-  bool _isFabVisible = true;
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReaderSessionsProvider>();
+    final theme = Theme.of(context);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFF090806),
-        floatingActionButton: AnimatedSlide(
-          duration: const Duration(milliseconds: 300),
-          offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
-            opacity: _isFabVisible ? 1.0 : 0.0,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 60.0),
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.of(context).pushNamed(AppRoutes.readerCreatePost);
-                },
-                backgroundColor: const Color(0xFFD9AF68),
-                foregroundColor: Colors.black,
-                label: const Text(
-                  'منشور جديد',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                icon: const Icon(Icons.edit_rounded),
-              ),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          centerTitle: true,
+          title: const Text(
+            'المجتمع',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
             ),
           ),
+          actions: [
+            if (Navigator.canPop(context))
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.08),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         body: Stack(
           children: [
@@ -55,251 +70,195 @@ class _ReaderSessionsScreenState extends State<ReaderSessionsScreen> {
             SafeArea(
               child: provider.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : NotificationListener<UserScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification.direction == ScrollDirection.idle) {
-                          if (!_isFabVisible) {
-                            setState(() => _isFabVisible = true);
-                          }
-                        } else {
-                          if (_isFabVisible) {
-                            setState(() => _isFabVisible = false);
-                          }
-                        }
-                        return false;
-                      },
-                      child: CustomScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                              child: _FeedHeader(provider: provider),
+                  : CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 1. Search Field
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF14110D),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.06),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'ابحث في المجتمع',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(alpha: 0.4),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.search,
+                                        color: Color(0xFFD9AF68),
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+
+                                // 2. Create Post inline Card
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF14110D),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.06),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'انشر للعالم ما يلهمك...',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(alpha: 0.6),
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          ElevatedButton.icon(
+                                            onPressed: () {
+                                              Navigator.of(context).pushNamed(AppRoutes.readerCreatePost);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFD9AF68),
+                                              foregroundColor: Colors.black,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 8,
+                                              ),
+                                            ),
+                                            icon: const Icon(Icons.edit_rounded, size: 16),
+                                            label: const Text(
+                                              'إنشاء منشور',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+
+                                // 3. Section Header
+                                Text(
+                                  'أحدث المنشورات',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (provider.posts.isEmpty)
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 40,
-                                  vertical: 80,
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.forum_outlined,
-                                      size: 64,
-                                      color: Colors.white.withValues(alpha: 0.15),
-                                    ),
-                                    const SizedBox(height: 18),
-                                    const Text(
-                                      'لا توجد منشورات اليوم',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'لا توجد منشورات خالص حالياً في مجلس القراء.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white38,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        ),
+                        if (provider.posts.isEmpty)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 40,
+                                vertical: 80,
                               ),
-                            )
-                          else
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
-                              sliver: SliverList.separated(
-                                itemCount: provider.posts.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 16),
-                                itemBuilder: (context, index) {
-                                  final post = provider.posts[index];
-                                  return _Reveal(
-                                    delay: Duration(milliseconds: 40 * index),
-                                    child: PostCard(
-                                      post: post,
-                                      timestampLabel: provider.formatTimestamp(
-                                        post.createdAt,
-                                      ),
-                                      onTap: () {
-                                        Navigator.of(context).pushNamed(
-                                          AppRoutes.readerPostDetail,
-                                          arguments: ReaderPostDetailArgs(
-                                            postId: post.id,
-                                          ),
-                                        );
-                                      },
-                                      onLikeTap: () =>
-                                          provider.toggleLike(post.id),
-                                      onCommentTap: () {
-                                        Navigator.of(context).pushNamed(
-                                          AppRoutes.readerPostDetail,
-                                          arguments: ReaderPostDetailArgs(
-                                            postId: post.id,
-                                          ),
-                                        );
-                                      },
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.forum_outlined,
+                                    size: 64,
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  const Text(
+                                    'لا توجد منشورات اليوم',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                  );
-                                },
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'لا توجد منشورات خالص حالياً في مجلس القراء.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
-                      ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+                            sliver: SliverList.separated(
+                              itemCount: provider.posts.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 16),
+                              itemBuilder: (context, index) {
+                                final post = provider.posts[index];
+                                return _Reveal(
+                                  delay: Duration(milliseconds: 40 * index),
+                                  child: PostCard(
+                                    post: post,
+                                    timestampLabel: provider.formatTimestamp(
+                                      post.createdAt,
+                                    ),
+                                    onTap: () {
+                                      Navigator.of(context).pushNamed(
+                                        AppRoutes.readerPostDetail,
+                                        arguments: ReaderPostDetailArgs(
+                                          postId: post.id,
+                                        ),
+                                      );
+                                    },
+                                    onLikeTap: () =>
+                                        provider.toggleLike(post.id),
+                                    onCommentTap: () {
+                                      Navigator.of(context).pushNamed(
+                                        AppRoutes.readerPostDetail,
+                                        arguments: ReaderPostDetailArgs(
+                                          postId: post.id,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
                     ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FeedHeader extends StatelessWidget {
-  const _FeedHeader({required this.provider});
-
-  final ReaderSessionsProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'مجلس القراء',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'شبكة اجتماعية هادئة للقراء: اقتباسات، مراجعات، وأسئلة تفتح حوارات حقيقية حول الكتب.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.66),
-                      height: 1.65,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: const Color(0xFF17130E),
-              ),
-              child: const Icon(
-                Icons.auto_stories_rounded,
-                color: Color(0xFFD9AF68),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            color: const Color(0xFF14110D),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 22,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              ActiveUsersBar(
-                readers: provider.activeReaders,
-                overflowCount: provider.activeReadersOverflow,
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatChip(
-                      value: '${provider.posts.length}',
-                      label: 'منشوراً اليوم',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _StatChip(
-                      value: '${provider.activeReaders.length}+',
-                      label: 'قارئاً نشطاً',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: _StatChip(value: '3', label: 'أنواع منشورات'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withValues(alpha: 0.04),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: const Color(0xFFD9AF68),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.62),
-              fontSize: 12,
-            ),
-          ),
-        ],
       ),
     );
   }

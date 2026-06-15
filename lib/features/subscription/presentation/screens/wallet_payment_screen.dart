@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/widgets/wallet_provider_selector.dart';
@@ -36,7 +35,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
       messenger.clearSnackBars();
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_selectPlanMessage, style: GoogleFonts.cairo()),
+          content: Text(_selectPlanMessage, style: TextStyle()),
           backgroundColor: Colors.red,
         ),
       );
@@ -75,7 +74,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
         SnackBar(
           content: Text(
             provider.lastPurchaseResult?.errorMessage ?? 'فشلت عملية الدفع',
-            style: GoogleFonts.cairo(),
+            style: TextStyle(),
           ),
           backgroundColor: Colors.red,
         ),
@@ -102,7 +101,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
         elevation: 0,
         title: Text(
           'الدفع عبر المحفظة الإلكترونية',
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             color: const Color(0xFFD4AF37),
             fontWeight: FontWeight.bold,
           ),
@@ -140,7 +139,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
                       ),
                       label: Text(
                         'استخدام بيانات تجريبية',
-                        style: GoogleFonts.cairo(
+                        style: TextStyle(
                           color: const Color(0xFFD4AF37),
                           fontWeight: FontWeight.w700,
                         ),
@@ -151,7 +150,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
                 const SizedBox(height: 32),
                 Text(
                   'رقم الهاتف للمحفظة',
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -169,10 +168,10 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (val) => provider.updateWalletPhoneNumber(val),
-                    style: GoogleFonts.cairo(color: Colors.white, fontSize: 18),
+                    style: TextStyle(color: Colors.white, fontSize: 18),
                     decoration: InputDecoration(
                       hintText: '01X XXXX XXXX',
-                      hintStyle: GoogleFonts.cairo(color: Colors.grey),
+                      hintStyle: TextStyle(color: Colors.grey),
                       prefixIcon: const Icon(
                         Icons.phone_iphone,
                         color: Colors.grey,
@@ -214,7 +213,7 @@ class _WalletPaymentScreenState extends State<WalletPaymentScreen> {
                         )
                       : Text(
                           paymentLabel,
-                          style: GoogleFonts.cairo(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),

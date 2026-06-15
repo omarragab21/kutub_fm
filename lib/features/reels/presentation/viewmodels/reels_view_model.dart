@@ -7,10 +7,12 @@ import '../../domain/entities/reel_model.dart';
 class ReelsViewModel extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _category;
+  final String? initialReelId;
   List<Reel> _reels = [];
   int _currentIndex = 0;
   bool _isLoading = false;
   StreamSubscription<QuerySnapshot>? _reelsSubscription;
+  PageController? _pageController;
 
   /// Cache of pre-warmed VideoPlayerControllers keyed by reel index.
   /// We keep a window of [current-1, current, current+1].
@@ -22,7 +24,12 @@ class ReelsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get category => _category;
 
-  ReelsViewModel({String? category}) : _category = category {
+  PageController get pageController {
+    _pageController ??= PageController(initialPage: _currentIndex);
+    return _pageController!;
+  }
+
+  ReelsViewModel({String? category, this.initialReelId}) : _category = category {
     loadReels();
   }
 
@@ -60,6 +67,13 @@ class ReelsViewModel extends ChangeNotifier {
             return Reel.fromFirestore(
                 doc.id, doc.data() as Map<String, dynamic>);
           }).toList();
+
+          if (initialReelId != null) {
+            final index = _reels.indexWhere((r) => r.id == initialReelId);
+            if (index != -1) {
+              _currentIndex = index;
+            }
+          }
         } else {
           _reels = [];
         }
@@ -168,6 +182,7 @@ class ReelsViewModel extends ChangeNotifier {
   void dispose() {
     _reelsSubscription?.cancel();
     _disposeAllControllers();
+    _pageController?.dispose();
     super.dispose();
   }
 

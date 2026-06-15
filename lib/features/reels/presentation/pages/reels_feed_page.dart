@@ -6,13 +6,14 @@ import '../../../../core/theme/app_theme.dart';
 
 class ReelsFeedPage extends StatelessWidget {
   final String? category;
+  final String? initialReelId;
 
-  const ReelsFeedPage({super.key, this.category});
+  const ReelsFeedPage({super.key, this.category, this.initialReelId});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ReelsViewModel(category: category),
+      create: (_) => ReelsViewModel(category: category, initialReelId: initialReelId),
       child: const _ReelsFeedView(),
     );
   }
@@ -100,6 +101,7 @@ class _ReelsFeedView extends StatelessWidget {
               )
             else
               PageView.builder(
+                controller: viewModel.pageController,
                 scrollDirection: Axis.vertical,
                 itemCount: viewModel.reels.length,
                 onPageChanged: viewModel.onPageChanged,
@@ -110,48 +112,6 @@ class _ReelsFeedView extends StatelessWidget {
                   );
                 },
               ),
-
-            // Top App Bar
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top + 8,
-                  left: 20,
-                  right: 20,
-                  bottom: 16,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: AppTheme.primary,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      viewModel.category != null ? 'ريلز - ${viewModel.category}' : 'ريلز الكتب',
-                      style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),

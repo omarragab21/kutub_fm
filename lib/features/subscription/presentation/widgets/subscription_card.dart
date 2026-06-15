@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 class SubscriptionCard extends StatelessWidget {
   final String title;
   final String description;
@@ -50,7 +48,7 @@ class SubscriptionCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? const Color(0xFFD4AF37) : Colors.white,
@@ -59,7 +57,7 @@ class SubscriptionCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     description,
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[400],
                     ),
@@ -73,7 +71,7 @@ class SubscriptionCard extends StatelessWidget {
               children: [
                 Text(
                   '${price.toStringAsFixed(0)} ج.م',
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: isSelected ? const Color(0xFFD4AF37) : Colors.white,
@@ -81,7 +79,7 @@ class SubscriptionCard extends StatelessWidget {
                 ),
                 Text(
                   '/ شهرياً',
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[500],
                   ),

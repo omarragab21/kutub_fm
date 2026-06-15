@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -328,7 +327,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                         const SizedBox(width: 8),
                         Text(
                           'نشر كـ مقطع ريلز',
-                          style: GoogleFonts.amiri(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -350,7 +349,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _titleController,
-                      style: GoogleFonts.amiri(color: Colors.white, fontSize: 16),
+                      style: TextStyle(color: Colors.white, fontSize: 16),
                       textDirection: TextDirection.rtl,
                       decoration: InputDecoration(
                         filled: true,
@@ -383,7 +382,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                     TextField(
                       controller: _descController,
                       maxLines: 4,
-                      style: GoogleFonts.amiri(color: Colors.white, fontSize: 16, height: 1.4),
+                      style: TextStyle(color: Colors.white, fontSize: 16, height: 1.4),
                       textDirection: TextDirection.rtl,
                       decoration: InputDecoration(
                         filled: true,
@@ -450,9 +449,10 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                                     'createdAt': FieldValue.serverTimestamp(),
                                   };
 
-                                  await FirebaseFirestore.instance
+                                  final docRef = await FirebaseFirestore.instance
                                       .collection('reels')
                                       .add(docData);
+                                  final newReelId = docRef.id;
 
                                   if (mounted) {
                                     // Close modal sheet
@@ -468,7 +468,9 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                                     // Pop back to home (root) and push the Reels feed
                                     navigator.popUntil((route) => route.isFirst);
                                     navigator.push(
-                                      MaterialPageRoute(builder: (context) => const ReelsFeedPage()),
+                                      MaterialPageRoute(
+                                        builder: (context) => ReelsFeedPage(initialReelId: newReelId),
+                                      ),
                                     );
                                   }
                                 } catch (e) {
@@ -507,7 +509,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                               )
                             : Text(
                                 'نشر الآن',
-                                style: GoogleFonts.amiri(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -639,7 +641,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                     ),
                     Text(
                       'معاينة مقطع الريل',
-                      style: GoogleFonts.amiri(
+                      style: TextStyle(
                         color: AppTheme.primary,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -692,7 +694,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
                         children: [
                           Text(
                             widget.args.sentenceText,
-                            style: GoogleFonts.amiri(
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               height: 1.5,
@@ -854,7 +856,7 @@ class _ReelPreviewPageState extends State<ReelPreviewPage> {
             : Icon(icon, size: 20, color: contentColor),
         label: Text(
           label,
-          style: GoogleFonts.amiri(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),

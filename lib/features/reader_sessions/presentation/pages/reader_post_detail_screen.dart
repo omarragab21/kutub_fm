@@ -62,7 +62,43 @@ class _ReaderPostDetailScreenState extends State<ReaderPostDetailScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: const Text('تفاصيل المنشور'),
+          automaticallyImplyLeading: false,
+          centerTitle: true,
+          title: const Text(
+            'تفاصيل المنشور',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+          actions: [
+            if (Navigator.canPop(context))
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.08),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: Padding(
           padding: EdgeInsets.only(

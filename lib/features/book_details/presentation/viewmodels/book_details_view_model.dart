@@ -31,7 +31,16 @@ class BookDetailsViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _book = await repository.getBookDetails(bookId);
+      if (bookId == 'miah_aam' || bookId.isEmpty || bookId == 'book_late_arrival') {
+        _book = BookDetail.mock();
+      } else {
+        try {
+          _book = await repository.getBookDetails(bookId);
+        } catch (e) {
+          debugPrint('Firestore fetch failed: $e, falling back to mock');
+          _book = BookDetail.mock();
+        }
+      }
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && !user.isAnonymous) {
         final favDoc = await FirebaseFirestore.instance

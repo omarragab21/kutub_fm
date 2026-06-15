@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
 import 'package:kutub_fm/features/subscription/presentation/widgets/credit_card_preview.dart';
@@ -46,7 +45,7 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
       messenger.clearSnackBars();
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_selectPlanMessage, style: GoogleFonts.cairo()),
+          content: Text(_selectPlanMessage, style: TextStyle()),
           backgroundColor: Colors.red,
         ),
       );
@@ -91,7 +90,7 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
         SnackBar(
           content: Text(
             provider.lastPurchaseResult?.errorMessage ?? 'فشلت عملية الدفع',
-            style: GoogleFonts.cairo(),
+            style: TextStyle(),
           ),
           backgroundColor: Colors.red,
         ),
@@ -123,7 +122,7 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
         elevation: 0,
         title: Text(
           'الدفع بالبطاقة البنكية',
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             color: const Color(0xFFD4AF37),
             fontWeight: FontWeight.bold,
           ),
@@ -164,7 +163,7 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
                       ),
                       label: Text(
                         'استخدام بيانات تجريبية',
-                        style: GoogleFonts.cairo(
+                        style: TextStyle(
                           color: const Color(0xFFD4AF37),
                           fontWeight: FontWeight.w700,
                         ),
@@ -246,7 +245,7 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
                         )
                       : Text(
                           paymentLabel,
-                          style: GoogleFonts.cairo(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -283,10 +282,10 @@ class _CreditCardPaymentScreenState extends State<CreditCardPaymentScreen> {
         obscureText: isPassword,
         inputFormatters: inputFormatters,
         onChanged: onChanged,
-        style: GoogleFonts.cairo(color: Colors.white),
+        style: TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: GoogleFonts.cairo(color: Colors.grey),
+          labelStyle: TextStyle(color: Colors.grey),
           prefixIcon: Icon(icon, color: Colors.grey),
           border: InputBorder.none,
           focusedBorder: OutlineInputBorder(

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -249,7 +248,7 @@ class _CreatorDetailsPageState extends State<CreatorDetailsPage> {
           Text(
             profile.name,
             textAlign: TextAlign.center,
-            style: GoogleFonts.amiri(
+            style: const TextStyle(
               color: AppTheme.primary,
               fontSize: 30,
               fontWeight: FontWeight.bold,
@@ -289,7 +288,7 @@ class _CreatorDetailsPageState extends State<CreatorDetailsPage> {
         ),
         child: Text(
           profile.bio,
-          style: GoogleFonts.amiri(
+          style: TextStyle(
             color: AppTheme.onSurface.withValues(alpha: 0.85),
             fontSize: 17,
             height: 1.75,
@@ -306,7 +305,7 @@ class _CreatorDetailsPageState extends State<CreatorDetailsPage> {
         children: [
           Text(
             'الكتب',
-            style: GoogleFonts.amiri(
+            style: const TextStyle(
               color: AppTheme.primary,
               fontSize: 22,
               fontWeight: FontWeight.bold,

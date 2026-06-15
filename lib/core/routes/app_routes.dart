@@ -22,6 +22,7 @@ import '../../features/reader_sessions/presentation/pages/reader_sessions_screen
 import '../../features/podcast/presentation/pages/podcast_list_page.dart';
 import '../../features/podcast/presentation/pages/podcast_detail_page.dart';
 import '../../features/reels/presentation/pages/reel_preview_page.dart';
+import '../../features/audio_library/presentation/pages/audio_library_screen.dart';
 
 import 'package:provider/provider.dart';
 import '../../features/profile/presentation/pages/settings_screen.dart';
@@ -53,6 +54,7 @@ class AppRoutes {
   static const String otpVerification = '/otp-verification';
   static const String search = '/search';
   static const String reelPreview = '/reel_preview';
+  static const String library = '/library';
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -257,6 +259,11 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => ReelPreviewPage(args: arg),
+        );
+      case library:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const AudioLibraryScreen(),
         );
       default:
         return MaterialPageRoute(

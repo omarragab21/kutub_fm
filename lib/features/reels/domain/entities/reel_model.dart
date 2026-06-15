@@ -58,9 +58,9 @@ class Reel {
       quote: data['quote'] ?? '',
       imageUrl: data['imageUrl'] ?? '',
       videoUrl: data['videoUrl'] ?? '',
-      likes: data['likes'] ?? 0,
-      comments: data['comments'] ?? 0,
-      shares: data['shares'] ?? 0,
+      likes: (data['likes'] is num) ? (data['likes'] as num).toInt() : 0,
+      comments: (data['comments'] is num) ? (data['comments'] as num).toInt() : 0,
+      shares: (data['shares'] is num) ? (data['shares'] as num).toInt() : 0,
     );
   }
 }

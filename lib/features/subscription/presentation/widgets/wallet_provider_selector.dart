@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kutub_fm/features/subscription/domain/entities/wallet_provider.dart';
 
 class WalletProviderSelector extends StatelessWidget {
@@ -19,7 +18,7 @@ class WalletProviderSelector extends StatelessWidget {
       children: [
         Text(
           'اختر مزود الخدمة',
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -61,7 +60,7 @@ class WalletProviderSelector extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           title,
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             color: isSelected ? color : Colors.white,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),

@@ -1,7 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 class CreditCardPreview extends StatelessWidget {
   final String cardNumber;
   final String cardHolder;
@@ -83,7 +81,7 @@ class CreditCardPreview extends StatelessWidget {
               const Icon(Icons.credit_card, color: Color(0xFFD4AF37), size: 32),
               Text(
                 'KUTUB PAY',
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   color: const Color(0xFFD4AF37),
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
@@ -94,7 +92,7 @@ class CreditCardPreview extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             _formattedNumber,
-            style: GoogleFonts.sourceCodePro(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 22,
               letterSpacing: 2,
@@ -110,14 +108,14 @@ class CreditCardPreview extends StatelessWidget {
                 children: [
                   Text(
                     'CARD HOLDER',
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       color: Colors.grey,
                       fontSize: 10,
                     ),
                   ),
                   Text(
                     cardHolder.isEmpty ? 'JOHN DOE' : cardHolder.toUpperCase(),
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -130,14 +128,14 @@ class CreditCardPreview extends StatelessWidget {
                 children: [
                   Text(
                     'EXPIRES',
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       color: Colors.grey,
                       fontSize: 10,
                     ),
                   ),
                   Text(
                     _formattedExpiry,
-                    style: GoogleFonts.sourceCodePro(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -193,7 +191,7 @@ class CreditCardPreview extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
                       cvv.isEmpty ? '***' : cvv,
-                      style: GoogleFonts.sourceCodePro(
+                      style: TextStyle(
                         color: Colors.black,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

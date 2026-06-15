@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:kutub_fm/features/subscription/domain/entities/payment_method.dart';
 import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
@@ -35,7 +34,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
       messenger.clearSnackBars();
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_selectPlanMessage, style: GoogleFonts.cairo()),
+          content: Text(_selectPlanMessage, style: TextStyle()),
           backgroundColor: Colors.red,
         ),
       );
@@ -59,7 +58,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
           SnackBar(
             content: Text(
               provider.lastPurchaseResult?.errorMessage ?? 'فشلت عملية الدفع',
-              style: GoogleFonts.cairo(),
+              style: TextStyle(),
             ),
             backgroundColor: Colors.red,
           ),
@@ -77,7 +76,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
           SnackBar(
             content: Text(
               provider.lastPurchaseResult?.errorMessage ?? 'فشلت عملية الدفع',
-              style: GoogleFonts.cairo(),
+              style: TextStyle(),
             ),
             backgroundColor: Colors.red,
           ),
@@ -115,7 +114,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
         elevation: 0,
         title: Text(
           'طريقة الدفع',
-          style: GoogleFonts.cairo(
+          style: TextStyle(
             color: const Color(0xFFD4AF37),
             fontWeight: FontWeight.bold,
           ),
@@ -135,7 +134,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
               children: [
                 Text(
                   'اختر طريقة الدفع المناسبة لك',
-                  style: GoogleFonts.cairo(fontSize: 18, color: Colors.white),
+                  style: TextStyle(fontSize: 18, color: Colors.white),
                 ),
                 const SizedBox(height: 24),
                 PaymentMethodCard(
@@ -194,7 +193,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                           )
                         : Text(
                             'المتابعة',
-                            style: GoogleFonts.cairo(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),

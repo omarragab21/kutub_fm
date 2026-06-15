@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 class PaymentSuccessScreen extends StatelessWidget {
   const PaymentSuccessScreen({Key? key}) : super(key: key);
 
@@ -46,7 +44,7 @@ class PaymentSuccessScreen extends StatelessWidget {
               const SizedBox(height: 48),
               Text(
                 'تم الدفع بنجاح!',
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -56,7 +54,7 @@ class PaymentSuccessScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'شكراً لك، تم تفعيل اشتراكك يمكنك الآن الاستمتاع بكافة المزايا',
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   color: Colors.grey[400],
                   fontSize: 16,
                 ),
@@ -79,7 +77,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                 ),
                 child: Text(
                   'العودة للرئيسية',
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFFD4AF37),

@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -33,7 +33,6 @@ class _BookTheme {
   static const Color labelColor = Color(0xFF8A7A58); // Dimmed label
   static const Color bodyColor = Color(0xFFD4C9AA); // Warm reading white
   static const Color bodyMuted = Color(0xFF9A8E72); // Secondary body
-  static const Color dialogColor = Color(0xFFE6D8B8); // Dialogue highlight
   static const Color dividerColor = Color(0xFF3A3020); // Warm divider
 
   // Ornamental separators
@@ -90,8 +89,6 @@ class BookReaderScreenArgs {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with TickerProviderStateMixin {
   // ── Audio ──────────────────────────────────────────────────────────────
-  bool _isSeeking = false;
-  Duration? _previewPosition;
 
   // ── Transcript ─────────────────────────────────────────────────────────
   TranscriptDocument? _doc;
@@ -107,6 +104,21 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   // ── Scroll ─────────────────────────────────────────────────────────────
   final ScrollController _scrollController = ScrollController();
+  double _scrollProgress = 0.0;
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    if (maxScroll > 0) {
+      final progress = (currentScroll / maxScroll).clamp(0.0, 1.0);
+      if ((progress - _scrollProgress).abs() > 0.01) {
+        setState(() {
+          _scrollProgress = progress;
+        });
+      }
+    }
+  }
 
   // ── Controls ───────────────────────────────────────────────────────────
   bool _controlsVisible = true;
@@ -119,11 +131,38 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   late AnimationController _fadeIn;
   late AnimationController _pulseCtr;
 
+  // ── Reading Settings State ──────────────────────────────────────────────
+  double _fontSize = 20.0;
+  String _themeMode = 'dark'; // Kept for backward compatibility
+  bool _isBookmarked = false;
+  final Map<int, Color> _highlightedSegments = {};
+  Color _selectedTextColor = const Color(
+    0xFFD4C9AA,
+  ); // Default: warm vanilla white
+
+  final List<Color> _textColorPresets = const [
+    Color(0xFFD4C9AA), // Warm reading white (vanilla)
+    Color(0xFFE8D5A3), // Parchment Gold
+    Color(0xFFFFFFFF), // Pure White
+    Color(0xFFB0BEC5), // Light Slate Gray
+    Color(0xFF8D6E63), // Muted Sepia Brown
+  ];
+
+  Color get _colorPageBg => const Color(0xFF0E0A05); // Fixed dark warm black
+  Color get _colorCardBg => const Color(0xFF1A1410); // Warm dark surface
+  Color get _colorAccent => AppTheme.primary; // Gold
+  Color get _colorBodyColor => _selectedTextColor;
+  Color get _colorMutedColor => _selectedTextColor.withOpacity(0.65);
+  Color get _colorTitleColor =>
+      const Color(0xFFE8D5A3); // Gold remains gold for titles
+  Color get _colorDividerColor => const Color(0xFF3A3020);
+
   // =========================================================================
   @override
   void initState() {
     super.initState();
     _bookCoverUrl = widget.bookCoverUrl;
+    _scrollController.addListener(_onScroll);
     _fadeIn = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -174,18 +213,65 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (canTrustRouteTranscript &&
           widget.transcript != null &&
           widget.transcript!.isNotEmpty) {
-        final Map<String, dynamic> decoded =
-            jsonDecode(widget.transcript!) as Map<String, dynamic>;
-        final doc = TranscriptDocument.fromJson(decoded);
-        if (!mounted) return;
-        setState(() {
-          _doc = doc;
-          _segmentKeys
-            ..clear()
-            ..addAll(List.generate(doc.segments.length, (_) => GlobalKey()));
-          _isLoading = false;
-        });
-        return;
+        try {
+          final Map<String, dynamic> decoded =
+              jsonDecode(widget.transcript!) as Map<String, dynamic>;
+          final doc = TranscriptDocument.fromJson(decoded);
+          if (!mounted) return;
+          setState(() {
+            _doc = doc;
+            _segmentKeys
+              ..clear()
+              ..addAll(List.generate(doc.segments.length, (_) => GlobalKey()));
+            _isLoading = false;
+          });
+          return;
+        } catch (e) {
+          log(
+            'Passed transcript parameter is not JSON, parsing as raw text dummy data: $e',
+          );
+          final rawText = widget.transcript!;
+          final lines = rawText.split(RegExp(r'\n+|\.\s+'));
+          final List<TranscriptSegment> segments = [];
+          double currentStart = 0.0;
+          int id = 0;
+          for (var line in lines) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty) continue;
+            final double duration = (trimmed.length * 0.1).clamp(3.0, 15.0);
+            segments.add(
+              TranscriptSegment(
+                id: id++,
+                text: trimmed,
+                start: currentStart,
+                end: currentStart + duration,
+                type: TranscriptSegmentType.normal,
+              ),
+            );
+            currentStart += duration;
+          }
+          final metadata = BookMetadata(
+            title: widget.bookTitle,
+            author: 'أحمد خالد توفيق',
+            genre: 'رواية',
+            translator: '',
+            narrator: '',
+            publisher: 'كتوب إف إم',
+          );
+          final doc = TranscriptDocument(
+            metadata: metadata,
+            segments: segments,
+          );
+          if (!mounted) return;
+          setState(() {
+            _doc = doc;
+            _segmentKeys
+              ..clear()
+              ..addAll(List.generate(doc.segments.length, (_) => GlobalKey()));
+            _isLoading = false;
+          });
+          return;
+        }
       }
 
       // 2. If chapterId is null or empty, load static asset default
@@ -222,7 +308,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           .doc(widget.pdfAssetPath)
           .get();
       final bookData = bookDoc.data() ?? {};
-      final resolvedCoverUrl = bookData['imageUrl'] as String? ?? widget.bookCoverUrl;
+      final resolvedCoverUrl =
+          bookData['imageUrl'] as String? ?? widget.bookCoverUrl;
       if (mounted) {
         setState(() {
           _bookCoverUrl = resolvedCoverUrl;
@@ -386,30 +473,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _resetTimer();
   }
 
-  void _seekTo(double sec) {
-    final audioProvider = context.read<AudioProvider>();
-    if (_isCurrentReadingAudio(audioProvider)) {
-      audioProvider.seekTo(sec);
-    } else {
-      unawaited(
-        audioProvider.playReadingAudio(
-          bookId: _readingBookId,
-          title: widget.bookTitle,
-          chapterId: widget.chapterId,
-          audioUrl: _effectiveAudioUrl,
-          autoplay: false,
-          initialPosition: Duration(milliseconds: (sec * 1000).round()),
-        ),
-      );
-    }
-    _resetTimer();
-  }
-
   void _seekBySegment(int idx) {
     final audioProvider = context.read<AudioProvider>();
     final seg = _doc?.segments[idx];
     if (seg == null) return;
     HapticFeedback.selectionClick();
+    setState(() {
+      _controlsVisible = true;
+    });
+    _resetTimer();
     unawaited(
       audioProvider.playReadingAudio(
         bookId: _readingBookId,
@@ -444,16 +516,6 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   //     ),
   //   );
   // }
-
-  void _skip(int delta, Duration position, Duration duration) {
-    final next = position + Duration(seconds: delta);
-    _seekTo(next.inSeconds.clamp(0, duration.inSeconds).toDouble());
-  }
-
-  Future<void> _cycleSpeed() async {
-    await context.read<AudioProvider>().cycleSpokenWordSpeed();
-    _resetTimer();
-  }
 
   void _resetTimer() {
     _hideTimer?.cancel();
@@ -557,7 +619,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     });
 
     return Scaffold(
-      backgroundColor: _BookTheme.pageBg,
+      resizeToAvoidBottomInset: false,
+      backgroundColor: _colorPageBg,
       body: _isLoading
           ? _loadingView()
           : _error != null
@@ -655,14 +718,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             child: _topBar(),
           ),
 
-          // Bottom audio player
+          // Bottom widget (floating player or progress bar)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 280),
             curve: Curves.easeInOut,
-            bottom: _controlsVisible ? 0 : -220,
+            bottom: _controlsVisible ? 0 : -250,
             left: 0,
             right: 0,
-            child: _audioControls(),
+            child: _bottomWidget(),
           ),
         ],
       ),
@@ -697,9 +760,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ),
         ),
 
-        // Bottom padding for audio player
+        // Bottom padding for audio player/reading progress
         SliverToBoxAdapter(
-          child: SizedBox(height: MediaQuery.of(context).padding.bottom + 240),
+          child: SizedBox(height: MediaQuery.of(context).padding.bottom + 185),
         ),
       ],
     );
@@ -719,8 +782,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             Text(
               meta.publisher,
               textAlign: TextAlign.center,
-              style: GoogleFonts.amiri(
-                color: _BookTheme.labelColor,
+              style: TextStyle(
+                color: _colorMutedColor,
                 fontSize: 13,
                 letterSpacing: 1.2,
               ),
@@ -737,8 +800,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           Text(
             meta.title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.amiri(
-              color: _BookTheme.titleColor,
+            style: TextStyle(
+              color: _colorTitleColor,
               fontSize: 44,
               fontWeight: FontWeight.bold,
               height: 1.3,
@@ -753,15 +816,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: _BookTheme.accent.withValues(alpha: 0.4),
-                ),
+                border: Border.all(color: _colorAccent.withOpacity(0.4)),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 meta.genre,
-                style: GoogleFonts.amiri(
-                  color: _BookTheme.accent.withValues(alpha: 0.75),
+                style: TextStyle(
+                  color: _colorAccent.withOpacity(0.75),
                   fontSize: 13,
                 ),
               ),
@@ -776,8 +837,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             Text(
               meta.author,
               textAlign: TextAlign.center,
-              style: GoogleFonts.amiri(
-                color: _BookTheme.metaColor,
+              style: TextStyle(
+                color: _colorMutedColor,
                 fontSize: 21,
                 fontWeight: FontWeight.w600,
               ),
@@ -790,20 +851,20 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           Row(
             children: [
               Expanded(
-                child: Container(height: 0.5, color: _BookTheme.dividerColor),
+                child: Container(height: 0.5, color: _colorDividerColor),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   _BookTheme.ornament,
                   style: TextStyle(
-                    color: _BookTheme.accent.withValues(alpha: 0.5),
+                    color: _colorAccent.withOpacity(0.5),
                     fontSize: 16,
                   ),
                 ),
               ),
               Expanded(
-                child: Container(height: 0.5, color: _BookTheme.dividerColor),
+                child: Container(height: 0.5, color: _colorDividerColor),
               ),
             ],
           ),
@@ -817,10 +878,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             Text(
               meta.translator,
               textAlign: TextAlign.center,
-              style: GoogleFonts.amiri(
-                color: _BookTheme.metaColor,
-                fontSize: 18,
-              ),
+              style: TextStyle(color: _colorMutedColor, fontSize: 18),
             ),
             const SizedBox(height: 20),
           ],
@@ -832,10 +890,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             Text(
               meta.narrator,
               textAlign: TextAlign.center,
-              style: GoogleFonts.amiri(
-                color: _BookTheme.metaColor,
-                fontSize: 18,
-              ),
+              style: TextStyle(color: _colorMutedColor, fontSize: 18),
             ),
           ],
 
@@ -872,46 +927,51 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Widget _segmentTile(int index, TranscriptSegment seg) {
     final isActive = index == _activeIndex;
     final isArabic = _isArabic(seg.text);
+    final customHighlightColor = _highlightedSegments[index];
 
     // Determine inline style based on type and active state
     Color textColor;
     FontWeight fontWeight;
     Color? highlightBg;
-    double fontSize = isArabic ? 20 : 16.5;
+    double fontSize = isArabic ? _fontSize : _fontSize - 3.5;
 
     if (isActive) {
       textColor = Colors.black;
       fontWeight = FontWeight.w600;
-      highlightBg = _BookTheme.accent;
-      fontSize = isArabic ? 21 : 17;
+      highlightBg = _colorAccent;
+      fontSize = isArabic ? _fontSize + 1 : _fontSize - 2.5;
+    } else if (customHighlightColor != null) {
+      textColor = Colors.black;
+      fontWeight = FontWeight.normal;
+      highlightBg = customHighlightColor;
     } else {
       switch (seg.type) {
         case TranscriptSegmentType.bold:
-          textColor = _BookTheme.bodyColor;
+          textColor = _colorBodyColor;
           fontWeight = FontWeight.bold;
           highlightBg = null;
           break;
         case TranscriptSegmentType.highlight:
           // Dialogue: warmer, slightly brighter
-          textColor = _BookTheme.dialogColor;
+          textColor = _colorTitleColor;
           fontWeight = FontWeight.w500;
           highlightBg = null;
           break;
         default:
-          textColor = _BookTheme.bodyColor.withValues(alpha: 0.82);
+          textColor = _colorBodyColor.withOpacity(0.82);
           fontWeight = FontWeight.normal;
           highlightBg = null;
       }
     }
 
     final style = isArabic
-        ? GoogleFonts.amiri(
+        ? TextStyle(
             color: textColor,
             fontSize: fontSize,
             fontWeight: fontWeight,
             height: 1.75,
           )
-        : GoogleFonts.crimsonPro(
+        : TextStyle(
             color: textColor,
             fontSize: fontSize,
             fontWeight: fontWeight,
@@ -925,33 +985,236 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       style: style,
     );
 
-    return GestureDetector(
+    final showHighlightDecoration = isActive || customHighlightColor != null;
+
+    Widget tile = GestureDetector(
       key: _segmentKeys[index],
-      onTap: () => _seekBySegment(index),
-      onDoubleTap: () => _showCreateReelBottomSheet(seg),
-      onLongPress: () => _showCreateReelBottomSheet(seg),
+      onTap: () => _showSegmentFloatingToolbar(index, seg),
+      onLongPress: () => _showSegmentFloatingToolbar(index, seg),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
         margin: EdgeInsets.only(bottom: _segmentBottomSpacing(seg, index)),
-        padding: isActive
+        padding: showHighlightDecoration
             ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
             : EdgeInsets.zero,
-        decoration: isActive
+        decoration: showHighlightDecoration
             ? BoxDecoration(
                 color: highlightBg,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: _BookTheme.accent.withValues(alpha: 0.4),
-                    blurRadius: 18,
-                    spreadRadius: 0,
-                  ),
-                ],
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: _colorAccent.withOpacity(0.4),
+                          blurRadius: 18,
+                          spreadRadius: 0,
+                        ),
+                      ]
+                    : null,
               )
             : null,
         child: textWidget,
       ),
+    );
+
+    if (isActive) {
+      final firstWords = seg.text.split(' ').take(3).join(' ') + '...';
+      tile = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Floating Pill Tooltip pointing to active text
+          Padding(
+            padding: const EdgeInsets.only(right: 10, bottom: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _colorAccent, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: _colorAccent.withOpacity(0.25),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.volume_up_rounded, color: _colorAccent, size: 12),
+                  const SizedBox(width: 4),
+                  Text(
+                    'كلمة الصوت الحالية: $firstWords',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          tile,
+        ],
+      );
+    }
+
+    return tile;
+  }
+
+  void _showSegmentFloatingToolbar(int index, TranscriptSegment seg) {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.40),
+      builder: (context) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E24),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: _colorAccent.withOpacity(0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.55),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 1. Copy button
+                    IconButton(
+                      icon: const Icon(
+                        Icons.copy_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: seg.text));
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('تم نسخ النص إلى الحافظة'),
+                          ),
+                        );
+                      },
+                      tooltip: 'نسخ النص',
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 2. Play/Listen button
+                    IconButton(
+                      icon: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _seekBySegment(index);
+                      },
+                      tooltip: 'استماع',
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 3. Share/Community button
+                    IconButton(
+                      icon: const Icon(
+                        Icons.people_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'تم نشر الاقتباس في مجتمع كتب FM بنجاح!',
+                              textDirection: TextDirection.rtl,
+                            ),
+                          ),
+                        );
+                      },
+                      tooltip: 'مشاركة مع المجتمع',
+                    ),
+
+                    // Divider
+                    Container(
+                      height: 24,
+                      width: 1.5,
+                      color: Colors.white.withOpacity(0.15),
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+
+                    // Color selectors
+                    ...[
+                      const Color(0xFFFFF176), // Yellow
+                      const Color(0xFFA5D6A7), // Green
+                      const Color(0xFFF48FB1), // Pink
+                      const Color(0xFF90CAF9), // Blue
+                      const Color(0xFFB0BEC5), // Grey/Silver
+                    ].map((color) {
+                      final isSelected = _highlightedSegments[index] == color;
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            if (isSelected) {
+                              _highlightedSegments.remove(index);
+                            } else {
+                              _highlightedSegments[index] = color;
+                            }
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color,
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              width: 2.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -971,10 +1234,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return 1;
   }
 
-  // ── Top bar ────────────────────────────────────────────────────────────
   Widget _topBar() {
-    final audioProvider = context.watch<AudioProvider>();
-
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 6,
@@ -986,53 +1246,99 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_BookTheme.pageBg, _BookTheme.pageBg.withValues(alpha: 0)],
+          colors: [_colorPageBg, _colorPageBg.withOpacity(0)],
         ),
       ),
       child: Row(
         children: [
+          // Settings button (left)
           IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: _BookTheme.metaColor,
-              size: 18,
-            ),
-            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.tune_rounded, color: _colorMutedColor, size: 20),
+            onPressed: _showSettingsDialog,
           ),
+
           Expanded(
             child: Text(
               _doc?.metadata.title ?? widget.bookTitle,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.amiri(
-                color: _BookTheme.titleColor,
+              style: TextStyle(
+                color: _colorTitleColor,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          // Speed badge
-          GestureDetector(
-            onTap: _cycleSpeed,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: _BookTheme.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _BookTheme.accent.withValues(alpha: 0.35),
-                ),
-              ),
-              child: Text(
-                '${audioProvider.spokenWordSpeed}x',
-                style: const TextStyle(
-                  color: _BookTheme.accent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          // Bookmark/Save button
+          IconButton(
+            icon: Icon(
+              _isBookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: _isBookmarked ? _colorAccent : _colorMutedColor,
+              size: 20,
             ),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _isBookmarked = !_isBookmarked;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _isBookmarked
+                        ? 'تم حفظ الصفحة بنجاح!'
+                        : 'تم إزالة الصفحة من المحفوظات',
+                    textDirection: TextDirection.rtl,
+                  ),
+                ),
+              );
+            },
+          ),
+          // Highlight Pen Button
+          IconButton(
+            icon: Icon(
+              Icons.border_color_rounded,
+              color: _highlightedSegments.isNotEmpty
+                  ? _colorAccent
+                  : _colorMutedColor,
+              size: 18,
+            ),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              if (_highlightedSegments.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'لتظليل أي نص، اضغط عليه واختر اللون المطلوب من القائمة العائمة.',
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
+                );
+              } else {
+                setState(() {
+                  _highlightedSegments.clear();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'تم مسح جميع التظليلات.',
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+          // Back button
+          IconButton(
+            icon: Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: _colorMutedColor,
+              size: 18,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),
@@ -1040,246 +1346,330 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   // ── Audio controls ─────────────────────────────────────────────────────
-  Widget _audioControls() {
+  Widget _bottomWidget() {
     final audioProvider = context.watch<AudioProvider>();
     final isCurrentReading = _isCurrentReadingAudio(audioProvider);
-    final effectiveDuration = isCurrentReading
-        ? audioProvider.duration
-        : Duration.zero;
-    final effectivePosition = _isSeeking && _previewPosition != null
-        ? _previewPosition!
-        : (isCurrentReading ? audioProvider.currentPosition : Duration.zero);
-    final isPlaying = isCurrentReading && audioProvider.isPlaying;
-    final posSec = effectivePosition.inMilliseconds / 1000.0;
-    final durSec = effectiveDuration.inMilliseconds > 0
-        ? effectiveDuration.inMilliseconds / 1000.0
-        : 1.0;
-    final progress = effectiveDuration.inMilliseconds > 0
-        ? (posSec / durSec).clamp(0.0, 1.0)
-        : 0.0;
+
+    if (isCurrentReading) {
+      return _audioControls();
+    } else {
+      return _readingProgressWidget(audioProvider);
+    }
+  }
+
+  Widget _readingProgressWidget(AudioProvider audioProvider) {
+    final stories = audioProvider.stories;
+    final idx = stories.indexWhere((s) => s.id == widget.chapterId);
+    final currentChapterIdx = idx != -1 ? idx : 0;
+    final String chapterLabel =
+        'الفصل ${_getArabicOrdinal(currentChapterIdx + 1)}';
 
     return Container(
+      decoration: BoxDecoration(
+        color: _colorCardBg,
+        border: Border(top: BorderSide(color: _colorDividerColor, width: 0.8)),
+      ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).padding.bottom + 12,
         top: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
         left: 24,
         right: 24,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            _BookTheme.pageBg,
-            _BookTheme.pageBg.withValues(alpha: 0.96),
-            _BookTheme.pageBg.withValues(alpha: 0),
-          ],
-          stops: const [0.0, 0.72, 1.0],
-        ),
-        border: Border(
-          top: BorderSide(
-            color: _BookTheme.dividerColor.withValues(alpha: 0.6),
-            width: 0.5,
-          ),
-        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Slim progress bar ──────────────────────────────────────
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _BookTheme.accent,
-              inactiveTrackColor: _BookTheme.dividerColor,
-              thumbColor: _BookTheme.accent,
-              overlayColor: _BookTheme.accent.withValues(alpha: 0.15),
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-            ),
-            child: Slider(
-              value: progress,
-              onChangeStart: (_) => setState(() => _isSeeking = true),
-              onChanged: (v) => setState(
-                () => _previewPosition = Duration(
-                  milliseconds: (v * durSec * 1000).round(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Left side: `< فصول الكتاب`
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showReaderChaptersBottomSheet(audioProvider);
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.chevron_left_rounded,
+                      color: _colorMutedColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'فصول الكتاب',
+                      style: TextStyle(
+                        color: _colorMutedColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              onChangeEnd: (v) {
-                setState(() {
-                  _isSeeking = false;
-                  _previewPosition = null;
-                });
-                _seekTo(v * durSec);
-              },
-            ),
-          ),
 
-          // ── Time labels ────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _fmt(effectivePosition),
-                  style: const TextStyle(
-                    color: _BookTheme.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    fontFeatures: [FontFeature.tabularFigures()],
+              // Right side: `الفصل الأول ∧`
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showReaderChaptersBottomSheet(audioProvider);
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      chapterLabel,
+                      style: TextStyle(
+                        color: _colorTitleColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _colorTitleColor, width: 1.0),
+                      ),
+                      child: Icon(
+                        Icons.keyboard_arrow_up_rounded,
+                        color: _colorTitleColor,
+                        size: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Dashed/Segmented Progress Bar
+          Row(
+            children: List.generate(10, (index) {
+              // For RTL, we fill from right to left (index 9 is rightmost, index 0 is leftmost).
+              // So we reverse the check: active if (9 - index) / 10 < progress.
+              final isFilled = (9 - index) / 10 < _scrollProgress;
+              return Expanded(
+                child: Container(
+                  height: 4,
+                  margin: EdgeInsets.only(
+                    left: index == 0 ? 0 : 3,
+                    right: index == 9 ? 0 : 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isFilled ? _colorAccent : _colorDividerColor,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
+
+          // Center: The Dark Navigation Pill
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(
+                0xFF2C221C,
+              ), // Lighter warm brown/black for contrast
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.06),
+                width: 0.5,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Left chevron (Navigates to previous chapter)
+                GestureDetector(
+                  onTap: () {
+                    if (currentChapterIdx > 0) {
+                      HapticFeedback.lightImpact();
+                      final prevStory = stories[currentChapterIdx - 1];
+                      Navigator.pushReplacementNamed(
+                        context,
+                        AppRoutes.bookReader,
+                        arguments: BookReaderScreenArgs(
+                          pdfAssetPath: widget.pdfAssetPath,
+                          bookTitle: widget.bookTitle,
+                          audioUrl: prevStory.audioUrl,
+                          chapterId: prevStory.id,
+                          bookCoverUrl: widget.bookCoverUrl,
+                        ),
+                      );
+                    }
+                  },
+                  child: Icon(
+                    Icons.chevron_left_rounded,
+                    color: currentChapterIdx > 0
+                        ? _colorAccent
+                        : Colors.white24,
+                    size: 20,
+                  ),
+                ),
+                Container(
+                  height: 14,
+                  width: 1,
+                  color: Colors.white24,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 Text(
-                  _fmt(effectiveDuration),
-                  style: const TextStyle(
-                    color: _BookTheme.labelColor,
-                    fontSize: 11,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                  '${currentChapterIdx + 1} / ${stories.length}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Container(
+                  height: 14,
+                  width: 1,
+                  color: Colors.white24,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                // Right chevron (Navigates to next chapter)
+                GestureDetector(
+                  onTap: () {
+                    if (currentChapterIdx < stories.length - 1) {
+                      HapticFeedback.lightImpact();
+                      final nextStory = stories[currentChapterIdx + 1];
+                      Navigator.pushReplacementNamed(
+                        context,
+                        AppRoutes.bookReader,
+                        arguments: BookReaderScreenArgs(
+                          pdfAssetPath: widget.pdfAssetPath,
+                          bookTitle: widget.bookTitle,
+                          audioUrl: nextStory.audioUrl,
+                          chapterId: nextStory.id,
+                          bookCoverUrl: widget.bookCoverUrl,
+                        ),
+                      );
+                    }
+                  },
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: currentChapterIdx < stories.length - 1
+                        ? _colorAccent
+                        : Colors.white24,
+                    size: 20,
                   ),
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // ── Playback buttons ───────────────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _autoStopToggle(),
-              const SizedBox(width: 16),
-              _skipBtn(
-                Icons.replay_10_rounded,
-                () => _skip(-10, effectivePosition, effectiveDuration),
-              ),
-              const SizedBox(width: 16),
-
-              // Play/Pause
-              GestureDetector(
-                onTap: _togglePlay,
-                child: AnimatedBuilder(
-                  animation: _pulseCtr,
-                  builder: (_, child) => Transform.scale(
-                    scale: isPlaying ? 1.0 + _pulseCtr.value * 0.035 : 1.0,
-                    child: child,
-                  ),
-                  child: Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      color: _BookTheme.accent,
-                      shape: BoxShape.circle,
-                      boxShadow: isPlaying
-                          ? [
-                              BoxShadow(
-                                color: _BookTheme.accent.withValues(
-                                  alpha: 0.45,
-                                ),
-                                blurRadius: 22,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: Icon(
-                      isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: Colors.black,
-                      size: 34,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 16),
-              _skipBtn(
-                Icons.forward_10_rounded,
-                () => _skip(10, effectivePosition, effectiveDuration),
-              ),
-              const SizedBox(width: 16),
-              _speedBtn(audioProvider.spokenWordSpeed),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _skipBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: _BookTheme.cardBg,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _BookTheme.dividerColor.withValues(alpha: 0.8),
-          ),
-        ),
-        child: Icon(icon, color: _BookTheme.metaColor, size: 22),
-      ),
-    );
-  }
+  Widget _audioControls() {
+    final audioProvider = context.watch<AudioProvider>();
+    final isCurrentReading = _isCurrentReadingAudio(audioProvider);
+    if (!isCurrentReading) return const SizedBox.shrink();
 
-  Widget _autoStopToggle() {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _autoStopMode = !_autoStopMode;
-        });
-      },
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: _autoStopMode
-              ? _BookTheme.accent.withValues(alpha: 0.15)
-              : _BookTheme.cardBg,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _autoStopMode
-                ? _BookTheme.accent
-                : _BookTheme.dividerColor.withValues(alpha: 0.8),
-          ),
-        ),
-        child: Icon(
-          _autoStopMode
-              ? Icons.stop_circle_rounded
-              : Icons.stop_circle_outlined,
-          color: _autoStopMode ? _BookTheme.accent : _BookTheme.metaColor,
-          size: 22,
-        ),
-      ),
-    );
-  }
+    final isPlaying = audioProvider.isPlaying;
+    final effectiveDuration = audioProvider.duration;
+    final effectivePosition = audioProvider.currentPosition;
 
-  Widget _speedBtn(double speed) {
-    return GestureDetector(
-      onTap: _cycleSpeed,
+    return Center(
       child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: _BookTheme.cardBg,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _BookTheme.dividerColor.withValues(alpha: 0.8),
-          ),
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 16,
+          left: 24,
+          right: 24,
         ),
-        child: Center(
-          child: Text(
-            '${speed}x',
-            style: const TextStyle(
-              color: _BookTheme.metaColor,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E24), // Elegant dark obsidian grey
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: _colorAccent.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 18,
+              spreadRadius: 2,
+              offset: const Offset(0, 5),
             ),
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. Audio active/pulsing indicator icon
+            Icon(
+              isPlaying ? Icons.volume_up_rounded : Icons.volume_mute_rounded,
+              color: _colorAccent,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+
+            // 2. Play / Pause Button
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _colorAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Colors.black,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // 3. Time status
+            Text(
+              '${_fmt(effectivePosition)} / ${_fmt(effectiveDuration)}',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Divider
+            Container(
+              height: 20,
+              width: 1,
+              color: Colors.white.withValues(alpha: 0.15),
+            ),
+            const SizedBox(width: 12),
+
+            // 4. Stop / Close Button
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                audioProvider.stop();
+              },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.redAccent,
+                  size: 18,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1287,7 +1677,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   void _showCreateReelBottomSheet(TranscriptSegment seg) {
     HapticFeedback.mediumImpact();
-    
+
     // Pause any playing audio first to prevent overlap
     final audioProvider = context.read<AudioProvider>();
     if (audioProvider.isPlaying) {
@@ -1337,7 +1727,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     Row(
                       children: [
                         const Icon(
@@ -1348,7 +1738,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         const SizedBox(width: 8),
                         Text(
                           'توليد مقطع ريلز',
-                          style: GoogleFonts.amiri(
+                          style: TextStyle(
                             color: _BookTheme.titleColor,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -1369,7 +1759,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       ),
                       child: Text(
                         seg.text,
-                        style: GoogleFonts.amiri(
+                        style: TextStyle(
                           color: _BookTheme.bodyColor,
                           fontSize: 16,
                           height: 1.5,
@@ -1441,9 +1831,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         child: DropdownButton<String>(
                           value: selectedType,
                           dropdownColor: _BookTheme.cardBg,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _BookTheme.accent),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: _BookTheme.accent,
+                          ),
                           isExpanded: true,
-                          style: GoogleFonts.amiri(color: Colors.white, fontSize: 15),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                          ),
                           onChanged: (String? value) {
                             if (value != null) {
                               setModalState(() {
@@ -1477,7 +1873,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          _processReelCreation(seg, selectedType, startTimeStr, endTimeStr);
+                          _processReelCreation(
+                            seg,
+                            selectedType,
+                            startTimeStr,
+                            endTimeStr,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _BookTheme.accent,
@@ -1489,7 +1890,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         ),
                         child: Text(
                           'إنشاء ريلز',
-                          style: GoogleFonts.amiri(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1521,10 +1922,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   ) async {
     final audioUrl = _effectiveAudioUrl;
     final coverUrl = _bookCoverUrl;
-    
+
     // Check for missing data
     if (audioUrl == null || audioUrl.isEmpty) {
-      _showErrorSnackBar('تعذر إنشاء مقطع الريل: رابط الملف الصوتي الخاص بالكتاب غير متوفر.');
+      _showErrorSnackBar(
+        'تعذر إنشاء مقطع الريل: رابط الملف الصوتي الخاص بالكتاب غير متوفر.',
+      );
       return;
     }
     if (coverUrl == null || coverUrl.isEmpty) {
@@ -1532,7 +1935,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     if (seg.start == 0.0 && seg.end == 0.0) {
-      _showErrorSnackBar('تعذر إنشاء مقطع الريل: الجملة المحددة لا تحتوي على طوابع زمنية.');
+      _showErrorSnackBar(
+        'تعذر إنشاء مقطع الريل: الجملة المحددة لا تحتوي على طوابع زمنية.',
+      );
       return;
     }
 
@@ -1558,7 +1963,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 backgroundColor: _BookTheme.cardBg,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: const BorderSide(color: _BookTheme.dividerColor, width: 1),
+                  side: const BorderSide(
+                    color: _BookTheme.dividerColor,
+                    width: 1,
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(28.0),
@@ -1570,7 +1978,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       Text(
                         currentProgressMessage,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.amiri(
+                        style: TextStyle(
                           color: _BookTheme.titleColor,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1608,8 +2016,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       final downloadUrl = createResponse['download_url']?.toString();
       final outputFile = createResponse['output_file']?.toString();
 
-      if (downloadUrl == null || downloadUrl.isEmpty || outputFile == null || outputFile.isEmpty) {
-        throw Exception('الاستجابة المستلمة من الخادم لا تحتوي على معلومات التحميل.');
+      if (downloadUrl == null ||
+          downloadUrl.isEmpty ||
+          outputFile == null ||
+          outputFile.isEmpty) {
+        throw Exception(
+          'الاستجابة المستلمة من الخادم لا تحتوي على معلومات التحميل.',
+        );
       }
 
       // Update loading dialog state
@@ -1617,7 +2030,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (mounted) setState(() {});
 
       // 2. Download generated video file
-      final localFilePath = await reelService.downloadReel(downloadUrl, outputFile);
+      final localFilePath = await reelService.downloadReel(
+        downloadUrl,
+        outputFile,
+      );
 
       // Fetch dynamic logo url configured in remote config
       final logoUrl = await reelService.getLogoUrl();
@@ -1677,17 +2093,401 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
+  void _showSettingsDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: _colorCardBg,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: _colorDividerColor, width: 0.5),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: _colorDividerColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'إعدادات القراءة',
+                      style: TextStyle(
+                        color: _colorTitleColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Font Size option
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'حجم الخط',
+                          style: TextStyle(
+                            color: _colorBodyColor,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.remove, color: _colorBodyColor),
+                              onPressed: _fontSize > 14
+                                  ? () {
+                                      setState(() => _fontSize--);
+                                      setModalState(() {});
+                                    }
+                                  : null,
+                            ),
+                            Text(
+                              '${_fontSize.round()}',
+                              style: TextStyle(
+                                color: _colorTitleColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.add, color: _colorBodyColor),
+                              onPressed: _fontSize < 32
+                                  ? () {
+                                      setState(() => _fontSize++);
+                                      setModalState(() {});
+                                    }
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Text Color selector option
+                    Text(
+                      'لون النص',
+                      style: TextStyle(color: _colorBodyColor, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: _textColorPresets.map((color) {
+                        final isSelected = _selectedTextColor == color;
+                        return GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              _selectedTextColor = color;
+                            });
+                            setModalState(() {});
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color,
+                              border: Border.all(
+                                color: isSelected
+                                    ? _colorAccent
+                                    : Colors.transparent,
+                                width: 3.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showReaderChaptersBottomSheet(AudioProvider audioProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: _colorCardBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border(
+                top: BorderSide(color: _colorDividerColor, width: 0.5),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _colorDividerColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'فصول الكتاب',
+                  style: TextStyle(
+                    color: _colorTitleColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.5,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: audioProvider.stories.length,
+                    itemBuilder: (context, idx) {
+                      final story = audioProvider.stories[idx];
+                      final isCurrent = story.id == widget.chapterId;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? _colorAccent.withOpacity(0.05)
+                              : Colors.white.withOpacity(0.02),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isCurrent
+                                ? _colorAccent.withOpacity(0.3)
+                                : Colors.white.withOpacity(0.06),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isCurrent
+                                    ? _colorAccent
+                                    : Colors.white.withOpacity(0.08),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${idx + 1}',
+                                  style: TextStyle(
+                                    color: isCurrent
+                                        ? (_themeMode == 'light'
+                                              ? Colors.white
+                                              : Colors.black)
+                                        : _colorBodyColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                story.title,
+                                style: TextStyle(
+                                  color: isCurrent
+                                      ? _colorAccent
+                                      : _colorBodyColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.menu_book_rounded,
+                                color: isCurrent
+                                    ? _colorAccent
+                                    : _colorBodyColor,
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pop(context);
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  AppRoutes.bookReader,
+                                  arguments: BookReaderScreenArgs(
+                                    pdfAssetPath: widget.pdfAssetPath,
+                                    bookTitle: widget.bookTitle,
+                                    audioUrl: story.audioUrl,
+                                    chapterId: story.id,
+                                    bookCoverUrl: widget.bookCoverUrl,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
-  Widget _thinRule() => Container(height: 0.5, color: _BookTheme.dividerColor);
+  Widget _thinRule() => Container(height: 0.5, color: _colorDividerColor);
 
   Widget _metaLabel(String label) => Text(
     label,
     textAlign: TextAlign.center,
-    style: GoogleFonts.amiri(
-      color: _BookTheme.labelColor,
+    style: TextStyle(
+      color: _colorMutedColor,
       fontSize: 13,
       letterSpacing: 0.8,
       fontStyle: FontStyle.italic,
     ),
   );
+
+  String _getArabicOrdinal(int n) {
+    switch (n) {
+      case 1:
+        return 'الأول';
+      case 2:
+        return 'الثاني';
+      case 3:
+        return 'الثالث';
+      case 4:
+        return 'الرابع';
+      case 5:
+        return 'الخامس';
+      case 6:
+        return 'السادس';
+      case 7:
+        return 'السابع';
+      case 8:
+        return 'الثامن';
+      case 9:
+        return 'التاسع';
+      case 10:
+        return 'العاشر';
+      default:
+        return 'الـ $n';
+    }
+  }
+}
+
+// ── Dashed Progress Bar for Reading Progress ───────────────────────────────
+class DashedProgressBar extends StatelessWidget {
+  final double progress;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const DashedProgressBar({
+    super.key,
+    required this.progress,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(double.infinity, 6),
+      painter: _DashedProgressBarPainter(
+        progress: progress,
+        activeColor: activeColor,
+        inactiveColor: inactiveColor,
+      ),
+    );
+  }
+}
+
+class _DashedProgressBarPainter extends CustomPainter {
+  final double progress;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  _DashedProgressBarPainter({
+    required this.progress,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+
+    final double y = size.height / 2;
+    const double dashWidth = 5.0;
+    const double spaceWidth = 4.0;
+    final double width = size.width;
+
+    double x = 0.0;
+    while (x < width) {
+      final double endX = (x + dashWidth).clamp(0.0, width);
+      final double centerX = (x + endX) / 2;
+      // In RTL (Arabic), active dashes start from the right (width) going left.
+      // So a dash is active if its center is >= width * (1 - progress).
+      final bool isActive = centerX >= width * (1 - progress);
+
+      paint.color = isActive ? activeColor : inactiveColor;
+      canvas.drawLine(Offset(x, y), Offset(endX, y), paint);
+      x += dashWidth + spaceWidth;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedProgressBarPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.inactiveColor != inactiveColor;
+  }
 }

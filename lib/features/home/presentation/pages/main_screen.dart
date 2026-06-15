@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:kutub_fm/features/profile/presentation/pages/profile_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:kutub_fm/features/reels/presentation/pages/reels_feed_page.dart';
 import 'package:kutub_fm/features/radio/presentation/pages/fm_radio_screen.dart';
 import 'package:kutub_fm/features/reader_sessions/presentation/pages/reader_sessions_screen.dart';
 import 'package:provider/provider.dart';
@@ -59,25 +60,25 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBottomNavBar(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       decoration: BoxDecoration(
-        color: const Color(0xFF353534).withValues(alpha: 0.6),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        color: const Color(0xFF353534).withValues(alpha: 0.85),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 32,
-            offset: const Offset(0, -8),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(theme, Icons.auto_stories, 'المكتبة', index: 0),
-          _buildNavItem(theme, Icons.play_circle, 'استمع', index: 1),
-          _buildNavItem(theme, Icons.radio, 'راديو', index: 2),
-          _buildNavItem(theme, Icons.person, 'الملف', index: 3),
+          _buildNavItem(theme, 'assets/home_smile.svg', index: 0),
+          _buildNavItem(theme, 'assets/community.svg', index: 1),
+          _buildNavItem(theme, 'assets/audio_wave.svg', index: 2),
+          _buildNavItem(theme, 'assets/play.svg', index: 3),
         ],
       ),
     );
@@ -85,60 +86,29 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildNavItem(
     ThemeData theme,
-    IconData icon,
-    String label, {
+    String svgAssetPath, {
     required int index,
   }) {
     final isSelected =
         context.watch<AppNavigationState>().selectedTabIndex == index;
+    final color = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant.withValues(
+            alpha: 0.6,
+          );
+
     return GestureDetector(
       onTap: () => _onItemTapped(index),
-      child: isSelected
-          ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Row(
-                children: [
-                  Icon(icon, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.6,
-                    ),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        color: Colors.transparent, // Expand tap area
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: SvgPicture.asset(
+          svgAssetPath,
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          width: isSelected ? 26 : 22,
+          height: isSelected ? 26 : 22,
+        ),
+      ),
     );
   }
 
@@ -151,7 +121,7 @@ class _MainScreenState extends State<MainScreen> {
       case 2:
         return const FMRadioScreen();
       case 3:
-        return const ProfileScreen();
+        return const ReelsFeedPage();
       default:
         return const SizedBox.shrink();
     }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
 import '../../domain/entities/reader_post.dart';
 
-class PostCard extends StatelessWidget {
+class PostCard extends StatefulWidget {
   const PostCard({
     super.key,
     required this.post,
@@ -19,13 +19,20 @@ class PostCard extends StatelessWidget {
   final VoidCallback onCommentTap;
 
   @override
+  State<PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<PostCard> {
+  bool _isBookmarked = false;
+
+  @override
   Widget build(BuildContext context) {
-    final typeStyle = _typeStyle(post.type);
+    final typeStyle = _typeStyle(widget.post.type);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(30),
         child: Ink(
           padding: const EdgeInsets.all(18),
@@ -48,7 +55,7 @@ class PostCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundImage: NetworkImage(post.userAvatarUrl),
+                    backgroundImage: NetworkImage(widget.post.userAvatarUrl),
                     backgroundColor: const Color(0xFF2A2118),
                   ),
                   const SizedBox(width: 12),
@@ -57,7 +64,7 @@ class PostCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          post.userName,
+                          widget.post.userName,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: Colors.white,
@@ -65,12 +72,27 @@ class PostCard extends StatelessWidget {
                               ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          timestampLabel,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 12,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              widget.timestampLabel,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55),
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Stars
+                            Row(
+                              children: List.generate(5, (index) {
+                                return Icon(
+                                  index < 4 ? Icons.star_rounded : Icons.star_border_rounded,
+                                  color: const Color(0xFFD9AF68),
+                                  size: 13,
+                                );
+                              }),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -85,7 +107,7 @@ class PostCard extends StatelessWidget {
                       color: typeStyle.backgroundColor,
                     ),
                     child: Text(
-                      post.type.label,
+                      widget.post.type.label,
                       style: TextStyle(
                         color: typeStyle.foregroundColor,
                         fontSize: 12,
@@ -95,36 +117,60 @@ class PostCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (post.bookTitle != null &&
-                  post.bookTitle!.trim().isNotEmpty) ...[
+              if (widget.post.bookTitle != null &&
+                  widget.post.bookTitle!.trim().isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: const Color(0xFF1D1812),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
                   ),
                   child: Row(
                     children: [
+                      // Book Cover Thumbnail
+                      Container(
+                        width: 40,
+                        height: 55,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(6),
+                          image: const DecorationImage(
+                            image: AssetImage('assets/miah_aam_cover.png'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.post.bookTitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFD9AF68),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'أحمد خالد توفيق',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const Icon(
                         Icons.menu_book_rounded,
                         color: Color(0xFFD9AF68),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          post.bookTitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFD9AF68),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        size: 20,
                       ),
                     ],
                   ),
@@ -132,7 +178,7 @@ class PostCard extends StatelessWidget {
               ],
               const SizedBox(height: 16),
               Text(
-                post.content,
+                widget.post.content,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.86),
                   height: 1.75,
@@ -142,19 +188,59 @@ class PostCard extends StatelessWidget {
               Row(
                 children: [
                   _ActionChip(
-                    icon: post.isLikedByMe
+                    icon: widget.post.isLikedByMe
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
-                    label: '${post.likeCount}',
-                    active: post.isLikedByMe,
-                    onTap: onLikeTap,
+                    label: '${widget.post.likeCount}',
+                    active: widget.post.isLikedByMe,
+                    onTap: widget.onLikeTap,
                   ),
                   const SizedBox(width: 10),
                   _ActionChip(
                     icon: Icons.chat_bubble_outline_rounded,
-                    label: '${post.totalCommentCount}',
+                    label: '${widget.post.totalCommentCount}',
                     active: false,
-                    onTap: onCommentTap,
+                    onTap: widget.onCommentTap,
+                  ),
+                  const SizedBox(width: 10),
+                  // Share Button
+                  IconButton(
+                    icon: Icon(
+                      Icons.share_outlined,
+                      color: const Color(0xFFD9AF68).withValues(alpha: 0.7),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم نسخ رابط المنشور!', textDirection: TextDirection.rtl),
+                        ),
+                      );
+                    },
+                  ),
+                  const Spacer(),
+                  // Bookmark Button
+                  IconButton(
+                    icon: Icon(
+                      _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                      color: const Color(0xFFD9AF68),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _isBookmarked = !_isBookmarked;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            _isBookmarked ? 'تم حفظ المنشور في المفضلة!' : 'تم إزالة المنشور من المفضلة',
+                            textDirection: TextDirection.rtl,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
