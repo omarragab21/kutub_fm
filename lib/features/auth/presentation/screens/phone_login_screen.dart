@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/auth_background.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
@@ -80,167 +81,175 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final phone = _phoneController.text.replaceAll(' ', '').trim();
+    String phone = _phoneController.text.replaceAll(' ', '').trim();
+    
+    // Normalize phone number to strip any leading zero and ensure +20 prefix
+    if (phone.startsWith('+20')) {
+      phone = phone.substring(3);
+    } else if (phone.startsWith('20')) {
+      phone = phone.substring(2);
+    }
+    
+    if (phone.startsWith('0')) {
+      phone = phone.substring(1);
+    }
+    
+    final finalPhone = '+20$phone';
+    
     _lastErrorMessage = null;
-    await context.read<AuthProvider>().sendPhoneOtp(phone);
+    await context.read<AuthProvider>().sendPhoneOtp(finalPhone);
+  }
+
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required Widget prefixIcon,
+    String? prefixText,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+      prefixIcon: prefixIcon,
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(color: Colors.white, fontSize: 16),
+      filled: true,
+      fillColor: Colors.black,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final isLoading = authProvider.status == AuthStatus.loading;
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: _autovalidate
-                      ? AutovalidateMode.onUserInteraction
-                      : AutovalidateMode.disabled,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(
-                        Icons.phone_android_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 72,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'تسجيل الدخول برقم الهاتف',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.displayLarge?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'أدخل رقم هاتفك لتلقي رمز التحقق (OTP) عبر رسالة نصية قصيرة.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        textDirection: TextDirection.ltr,
-                        decoration: _inputDecoration(
-                          context,
-                          label: 'رقم الهاتف',
-                          hint: '+201012345678',
-                          icon: Icons.phone_enabled_outlined,
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'برجاء إدخال رقم الهاتف';
-                          }
-                          final clean = value.replaceAll(' ', '').trim();
-                          if (!clean.startsWith('+')) {
-                            return 'يجب أن يبدأ رقم الهاتف بـ + ومفتاح الدولة';
-                          }
-                          if (clean.length < 10) {
-                            return 'رقم الهاتف غير صحيح (10 أرقام على الأقل)';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: isLoading ? null : _sendOtp,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+      child: AuthBackground(
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _autovalidate
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'تسجيل برقم الهاتف',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'أدخل رقم هاتفك لتلقي رمز التحقق OTP برسالة نصية قصيرة SMS',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Phone Input Field
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                textDirection: TextDirection.ltr,
+                decoration: _inputDecoration(
+                  hintText: '10500812',
+                  prefixIcon: const Icon(Icons.smartphone_rounded, color: Colors.white54),
+                  prefixText: '\u200e+20 ',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'برجاء إدخال رقم الهاتف';
+                  }
+                  String clean = value.replaceAll(' ', '').trim();
+                  if (clean.startsWith('+20')) {
+                    clean = clean.substring(3);
+                  } else if (clean.startsWith('20')) {
+                    clean = clean.substring(2);
+                  }
+                  if (clean.startsWith('0')) {
+                    clean = clean.substring(1);
+                  }
+                  if (clean.length < 9) {
+                    return 'رقم الهاتف غير صحيح';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 28),
+              // Submit Button
+              SizedBox(
+                height: 52,
+                child: FilledButton(
+                  onPressed: isLoading ? null : _sendOtp,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFC00E),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          'إرسال كود التحقق',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                ),
-                              )
-                            : const Text(
-                                'إرسال كود التحقق',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'تريد العودة؟',
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: isLoading
-                                ? null
-                                : () => Navigator.pop(context),
-                            child: const Text('تسجيل الدخول بالبريد'),
-                          ),
-                        ],
-                      ),
-                    ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Footer link: عودة للخلف
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+                  label: const Text(
+                    'عودة للخلف',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(
-    BuildContext context, {
-    required String label,
-    required String hint,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      prefixIcon: Icon(icon),
-      filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.35,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
-      floatingLabelBehavior: FloatingLabelBehavior.always,
-      hintStyle: TextStyle(
-        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
       ),
     );
   }

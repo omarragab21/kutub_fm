@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_bottom_nav_tab.dart';
+
 class AppNavigationState extends ChangeNotifier {
   late final AppNavigatorObserver observer = AppNavigatorObserver._(this);
 
@@ -9,6 +11,8 @@ class AppNavigationState extends ChangeNotifier {
   bool _notificationScheduled = false;
 
   int get selectedTabIndex => _selectedTabIndex;
+  AppBottomNavTab get selectedTab =>
+      AppBottomNavTab.fromIndex(_selectedTabIndex);
 
   String? get currentRouteName => _currentRouteName;
   Object? get currentRouteArguments => _currentRouteArguments;
@@ -33,6 +37,8 @@ class AppNavigationState extends ChangeNotifier {
     _selectedTabIndex = index;
     notifyListeners();
   }
+
+  void setSelectedTab(AppBottomNavTab tab) => setSelectedIndex(tab.tabIndex);
 
   void _scheduleNotification() {
     if (_notificationScheduled) return;

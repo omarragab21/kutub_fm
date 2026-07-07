@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
-import '../../../../core/validators/auth_validators.dart';
 import '../../../../core/dialogs/loading_dialog.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/auth_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  bool _showEmailForm = false;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -27,394 +29,408 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _loginWithEmail() async {
     FocusScope.of(context).unfocus();
-
     if (!_autovalidate) {
-      setState(() {
-        _autovalidate = true;
-      });
+      setState(() => _autovalidate = true);
     }
-
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final authProvider = context.read<AuthProvider>();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
     LoadingDialog.show(context, message: 'جاري تسجيل الدخول...');
-
     try {
       await authProvider.login(
-        email: AuthValidators.normalizeEmail(_emailController.text),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
-    } catch (e) {
-      // Handled by Provider
+    } catch (_) {
     } finally {
-      if (mounted) {
-        LoadingDialog.hide(context);
-      }
+      if (mounted) LoadingDialog.hide(context);
     }
 
     if (!mounted) return;
 
-    if (authProvider.status == AuthStatus.error &&
-        authProvider.errorMessage != null) {
+    if (authProvider.status == AuthStatus.error && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            authProvider.errorMessage!,
-            style: TextStyle(color: Colors.white),
-          ),
-          duration: const Duration(seconds: 2),
+          content: Text(authProvider.errorMessage!),
           backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
 
-    _navigateForStatus(authProvider.status);
+    if (authProvider.status == AuthStatus.emailNotVerified) {
+      Navigator.pushReplacementNamed(context, AppRoutes.emailVerification);
+    } else if (authProvider.status == AuthStatus.authenticated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.authSuccess);
+    }
   }
 
   Future<void> _signInWithGoogle() async {
     final authProvider = context.read<AuthProvider>();
-
     LoadingDialog.show(context, message: 'جاري تسجيل الدخول بجوجل...');
-
     try {
       await authProvider.signInWithGoogle();
-    } catch (e) {
-      // Handled by Provider
-    } finally {
-      if (mounted) {
-        LoadingDialog.hide(context);
-      }
-    }
+    } catch (_) {}
+    if (mounted) LoadingDialog.hide(context);
 
     if (!mounted) return;
-
-    if (authProvider.status == AuthStatus.error &&
-        authProvider.errorMessage != null) {
+    if (authProvider.status == AuthStatus.authenticated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.authSuccess);
+    } else if (authProvider.status == AuthStatus.error && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            authProvider.errorMessage!,
-            style: const TextStyle(color: Colors.white),
-          ),
-          duration: const Duration(seconds: 2),
+          content: Text(authProvider.errorMessage!),
           backgroundColor: Colors.redAccent,
         ),
       );
-      return;
     }
-
-    _navigateForStatus(authProvider.status);
   }
 
-  Future<void> _continueAsGuest() async {
+  Future<void> _signInWithFacebook() async {
     final authProvider = context.read<AuthProvider>();
-
-    LoadingDialog.show(context, message: 'جاري الدخول كزائر...');
-
+    LoadingDialog.show(context, message: 'جاري تسجيل الدخول بفيسبوك...');
     try {
-      await authProvider.continueAsGuest();
-    } catch (e) {
-      // Handled by Provider
-    } finally {
-      if (mounted) {
-        LoadingDialog.hide(context);
-      }
-    }
+      await authProvider.signInWithFacebook();
+    } catch (_) {}
+    if (mounted) LoadingDialog.hide(context);
 
     if (!mounted) return;
-
-    if (authProvider.status == AuthStatus.error &&
-        authProvider.errorMessage != null) {
+    if (authProvider.status == AuthStatus.authenticated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.authSuccess);
+    } else if (authProvider.status == AuthStatus.error && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            authProvider.errorMessage!,
-            style: TextStyle(color: Colors.white),
-          ),
-          duration: const Duration(seconds: 2),
+          content: Text(authProvider.errorMessage!),
           backgroundColor: Colors.redAccent,
         ),
       );
-      return;
     }
-
-    _navigateForStatus(authProvider.status);
   }
 
   Future<void> _resetPassword() async {
-    final emailController = TextEditingController(text: _emailController.text);
-    final formKey = GlobalKey<FormState>();
-
-    final email = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('استعادة كلمة المرور'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            textDirection: TextDirection.ltr,
-            decoration: const InputDecoration(
-              hintText: 'name@example.com',
-              labelText: 'البريد الإلكتروني',
-            ),
-            validator: AuthValidators.validateLoginEmail,
-          ),
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى إدخال بريد إلكتروني صحيح أولاً لإرسال رابط استعادة كلمة المرور'),
+          backgroundColor: Colors.orangeAccent,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(
-                  context,
-                  AuthValidators.normalizeEmail(emailController.text),
-                );
-              }
-            },
-            child: const Text('إرسال'),
-          ),
-        ],
-      ),
-    );
-    emailController.dispose();
-
-    if (email == null || email.trim().isEmpty || !mounted) return;
+      );
+      return;
+    }
 
     final authProvider = context.read<AuthProvider>();
-    
-    LoadingDialog.show(context, message: 'جاري إرسال الرابط...');
-
+    LoadingDialog.show(context, message: 'جاري إرسال طلب استعادة كلمة المرور...');
     try {
       await authProvider.resetPassword(email);
-    } catch (e) {
-      // Handled by Provider
-    } finally {
       if (mounted) {
-        LoadingDialog.hide(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال رابط استعادة كلمة المرور لبريدك الإلكتروني'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
+    } catch (_) {
+    } finally {
+      if (mounted) LoadingDialog.hide(context);
     }
-
-    if (!mounted) return;
-    final error = authProvider.errorMessage;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error ?? 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني',
-        ),
-        backgroundColor: error == null ? Colors.green : Colors.redAccent,
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
-  void _navigateForStatus(AuthStatus status) {
-    if (status == AuthStatus.guest) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
-    } else if (status == AuthStatus.authenticated) {
-      final authProvider = context.read<AuthProvider>();
-      final nextRoute = authProvider.isCategorySelectionCompleted
-          ? AppRoutes.home
-          : AppRoutes.categorySelection;
-      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
-    } else if (status == AuthStatus.emailNotVerified) {
-      Navigator.pushReplacementNamed(context, AppRoutes.emailVerification);
-    }
+  InputDecoration _inputDecoration({
+    required String hintText,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.black,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final authProvider = context.watch<AuthProvider>();
-    final isLoading = authProvider.status == AuthStatus.loading;
-
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: _autovalidate
-                      ? AutovalidateMode.onUserInteraction
-                      : AutovalidateMode.disabled,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(
-                        Icons.menu_book_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 72,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'تسجيل الدخول',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.displayLarge?.copyWith(
-                          fontSize: 34,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'ادخل إلى مكتبتك الصوتية وواصل رحلتك',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textDirection: TextDirection.ltr,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: _inputDecoration(
-                          context,
-                          label: 'البريد الإلكتروني',
-                          icon: Icons.mail_outline_rounded,
-                        ),
-                        validator: AuthValidators.validateLoginEmail,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        autofillHints: const [AutofillHints.password],
-                        textDirection: TextDirection.ltr,
-                        decoration: _inputDecoration(
-                          context,
-                          label: 'كلمة المرور',
-                          icon: Icons.lock_outline_rounded,
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            ),
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: AuthValidators.validateLoginPassword,
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: isLoading ? null : _resetPassword,
-                          child: const Text('نسيت كلمة المرور؟'),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: isLoading ? null : _login,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                        ),
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                ),
-                              )
-                            : const Text('تسجيل الدخول'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: isLoading ? null : _signInWithGoogle,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                        ),
-                        icon: const Icon(Icons.g_mobiledata, size: 28),
-                        label: const Text('تسجيل الدخول بجوجل'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: isLoading
-                            ? null
-                            : () => Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.phoneLogin,
-                                ),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                        ),
-                        icon: const Icon(Icons.phone_android_rounded, size: 22),
-                        label: const Text('تسجيل الدخول برقم الهاتف'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        onPressed: isLoading ? null : _continueAsGuest,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                        ),
-                        child: const Text('الدخول كزائر'),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'ليس لديك حساب؟',
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: isLoading
-                                ? null
-                                : () => Navigator.pushReplacementNamed(
-                                    context,
-                                    AppRoutes.register,
-                                  ),
-                            child: const Text('إنشاء حساب'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+      child: AuthBackground(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _showEmailForm ? _buildEmailForm() : _buildLoginOptions(),
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    Widget? suffixIcon,
-  }) {
-    final theme = Theme.of(context);
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon),
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.35,
+  Widget _buildLoginOptions() {
+    return Column(
+      key: const ValueKey('options'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'تسجيل الدخول',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Google Button
+        _buildSocialButton(
+          text: 'حساب جوجل',
+          iconPath: 'assets/google_icon.svg',
+          onPressed: _signInWithGoogle,
+        ),
+        const SizedBox(height: 12),
+        // Facebook Button
+        _buildSocialButton(
+          text: 'فيسبوك',
+          iconPath: 'assets/facebook_icon.svg',
+          onPressed: _signInWithFacebook,
+        ),
+        const SizedBox(height: 12),
+        // Email Button
+        _buildSocialButton(
+          text: 'البريد الإلكتروني',
+          iconPath: 'assets/email_icon.svg',
+          onPressed: () {
+            setState(() {
+              _showEmailForm = true;
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        // Phone Button
+        _buildSocialButton(
+          text: 'رقم الهاتف',
+          icon: const Icon(Icons.smartphone_rounded, color: Colors.white, size: 20),
+          onPressed: () {
+            Navigator.pushNamed(context, AppRoutes.phoneLogin);
+          },
+        ),
+        const SizedBox(height: 36),
+        // Footer: ليس لديك حساب؟ إنشاء حساب جديد
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'ليس لديك حساب؟ ',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.pushReplacementNamed(context, AppRoutes.register);
+              },
+              child: const Text(
+                'إنشاء حساب جديد',
+                style: TextStyle(
+                  color: Color(0xFF2196F3),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildEmailForm() {
+    return Form(
+      key: _formKey,
+      autovalidateMode: _autovalidate
+          ? AutovalidateMode.onUserInteraction
+          : AutovalidateMode.disabled,
+      child: Column(
+        key: const ValueKey('emailForm'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'تسجيل بالبريد الإلكتروني',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Email Field
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            textDirection: TextDirection.ltr,
+            decoration: _inputDecoration(
+              hintText: 'example@gmail.com',
+              suffixIcon: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: SvgPicture.asset('assets/email_icon.svg', width: 20, height: 20),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'برجاء إدخال البريد الإلكتروني';
+              }
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                return 'البريد الإلكتروني غير صحيح';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          // Password Field
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            textDirection: TextDirection.ltr,
+            decoration: _inputDecoration(
+              hintText: 'كلمة المرور',
+              prefixIcon: const Icon(Icons.lock_outline_rounded, color: Colors.white54),
+              suffixIcon: IconButton(
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: Colors.white54,
+                ),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'برجاء إدخال كلمة المرور';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 8),
+          // Forgot Password Link
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _resetPassword,
+              child: const Text(
+                'نسيت كلمة المرور؟',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Yellow Submit Button
+          SizedBox(
+            height: 52,
+            child: FilledButton(
+              onPressed: _loginWithEmail,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFFC00E),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'تسجيل الدخول',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Back Link: عودة للخلف
+          Center(
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showEmailForm = false;
+                  _autovalidate = false;
+                });
+              },
+              icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+              label: const Text(
+                'عودة للخلف',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String text,
+    String? iconPath,
+    Widget? icon,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: const BorderSide(color: Colors.white24, width: 1.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          iconPath != null
+              ? SvgPicture.asset(iconPath, width: 20, height: 20)
+              : (icon ?? const SizedBox.shrink()),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

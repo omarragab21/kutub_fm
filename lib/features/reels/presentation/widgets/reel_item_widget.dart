@@ -217,6 +217,22 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
             .toList();
 
         final bookDetail = BookDetail.fromFirestore(bookData, bookId, chapters);
+        final readableChapters = bookDetail.chapters
+            .where((chapter) => chapter.isReadableAudio)
+            .toList(growable: false);
+
+        if (readableChapters.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'لا يوجد فصل جاهز لهذا الكتاب حالياً',
+                textDirection: TextDirection.rtl,
+              ),
+            ),
+          );
+          return;
+        }
 
         if (!mounted) return;
 
@@ -226,46 +242,32 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
           arguments: BookReaderScreenArgs(
             pdfAssetPath: bookDetail.id,
             bookTitle: bookDetail.title,
-            audioUrl: bookDetail.chapters.isNotEmpty
-                ? bookDetail.chapters[0].audioUrl
-                : '',
-            chapterId: bookDetail.chapters.isNotEmpty
-                ? bookDetail.chapters[0].id
-                : '',
-            transcript: bookDetail.chapters.isNotEmpty
-                ? bookDetail.chapters[0].transcript
-                : null,
+            audioUrl: readableChapters[0].audioUrl,
+            chapterId: readableChapters[0].id,
+            transcript: readableChapters[0].transcript,
             bookCoverUrl: bookDetail.imageUrl,
           ),
         );
       } else {
         if (!mounted) return;
-        Navigator.pushNamed(
-          context,
-          AppRoutes.bookReader,
-          arguments: BookReaderScreenArgs(
-            pdfAssetPath: 'miah_aam',
-            bookTitle: widget.reel.bookTitle,
-            audioUrl: '',
-            chapterId: 'ch1',
-            transcript: null,
-            bookCoverUrl: widget.reel.imageUrl,
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'لم يتم العثور على الكتاب في Firebase',
+              textDirection: TextDirection.rtl,
+            ),
           ),
         );
       }
     } catch (e) {
       debugPrint('Error navigating to book: $e');
       if (!mounted) return;
-      Navigator.pushNamed(
-        context,
-        AppRoutes.bookReader,
-        arguments: BookReaderScreenArgs(
-          pdfAssetPath: 'miah_aam',
-          bookTitle: widget.reel.bookTitle,
-          audioUrl: '',
-          chapterId: 'ch1',
-          transcript: null,
-          bookCoverUrl: widget.reel.imageUrl,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تعذر فتح الكتاب من Firebase: $e',
+            textDirection: TextDirection.rtl,
+          ),
         ),
       );
     }

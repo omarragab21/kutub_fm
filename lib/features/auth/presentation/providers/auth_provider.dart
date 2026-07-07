@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,7 @@ import '../../data/services/firebase_auth_service.dart';
 import '../../data/services/firebase_storage_service.dart';
 import '../../data/services/user_firestore_service.dart';
 import '../../utils/auth_helpers.dart';
+import '../../../../core/services/firebase_facebook_auth_service.dart';
 
 enum AuthStatus {
   initial,
@@ -259,6 +261,28 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> signInWithFacebook() async {
+    await _runAuthAction(() async {
+      final credential = await FirebaseFacebookAuthService().signInWithFacebook();
+      _user = credential.user ?? _service.currentUser;
+      if (_user != null) {
+        await _firestore.createUserDocument(
+          uid: _user!.uid,
+          name: _user!.displayName ?? 'مستخدم كتب FM',
+          email: _user!.email ?? '',
+          photoUrl: _user!.photoURL,
+          provider: 'facebook',
+          emailVerified: true,
+          userType: 'normal_user',
+          emailDomain: _user!.email != null ? extractEmailDomain(_user!.email!) : null,
+          appEmailVerified: true,
+          firebaseEmailVerified: true,
+          verificationMode: 'facebook_sign_in',
+        );
+      }
+    });
+  }
+
   Future<void> resendVerificationEmail() async {
     await _runNonAuthAction(() async {
       await _service.sendEmailVerification();
@@ -360,6 +384,71 @@ class AuthProvider extends ChangeNotifier {
       await _service.updateDisplayName(name);
       await _refreshCurrentUser();
     });
+  }
+
+  Future<void> completeUserProfile({
+    required String name,
+    File? profileImage,
+  }) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final firebaseUser = _user ?? _service.currentUser;
+      if (firebaseUser == null) {
+        throw Exception('لا يوجد مستخدم مسجل حالياً');
+      }
+
+      String? photoUrl = firebaseUser.photoURL;
+
+      if (profileImage != null) {
+        photoUrl = await _storage.uploadProfileImage(
+          imageFile: profileImage,
+          uid: firebaseUser.uid,
+        );
+      }
+
+      await _service.updateUserProfile(name: name, photoUrl: photoUrl);
+      
+      final emailDomain = firebaseUser.email != null ? extractEmailDomain(firebaseUser.email!) : null;
+      final userType = firebaseUser.email != null ? detectUserTypeFromEmail(firebaseUser.email!) : 'normal_user';
+
+      // Save categorySelectionCompleted = true as well since this is the final onboarding step
+      await _firestore.createUserDocument(
+        uid: firebaseUser.uid,
+        name: name,
+        email: firebaseUser.email ?? '',
+        photoUrl: photoUrl,
+        provider: _appUser?.provider ?? 'phone',
+        emailVerified: firebaseUser.emailVerified,
+        userType: _appUser?.userType ?? userType,
+        emailDomain: _appUser?.emailDomain ?? emailDomain,
+        appEmailVerified: _appUser?.appEmailVerified ?? firebaseUser.emailVerified,
+        firebaseEmailVerified: _appUser?.firebaseEmailVerified ?? firebaseUser.emailVerified,
+        verificationMode: _appUser?.verificationMode ?? 'phone_otp',
+        phoneNumber: firebaseUser.phoneNumber ?? _appUser?.phoneNumber,
+      );
+
+      // Also set categorySelectionCompleted = true in the Firestore users document
+      final userRef = FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid);
+      await userRef.set({
+        'categorySelectionCompleted': true,
+        'categorySelectionUpdatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _refreshCurrentUser();
+      _status = AuthStatus.authenticated;
+    } on FirebaseAuthException catch (error) {
+      _setError(_mapAuthError(error));
+    } on FirebaseException catch (error) {
+      _setError(_mapFirebaseError(error));
+    } catch (error) {
+      _setError(error.toString().replaceFirst('Exception: ', ''));
+    }
+
+    notifyListeners();
   }
 
   Future<void> logout() async {

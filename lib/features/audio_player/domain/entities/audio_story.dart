@@ -11,6 +11,7 @@ class AudioStory {
   final int shares;
   final int saves;
   final String? audioUrl;
+  final String? transcript;
 
   AudioStory({
     required this.id,
@@ -25,6 +26,7 @@ class AudioStory {
     required this.shares,
     required this.saves,
     this.audioUrl,
+    this.transcript,
   });
 
   // ── Curated Arabic audiobook entries ─────────────────────────────────────

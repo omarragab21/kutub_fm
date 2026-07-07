@@ -1,18 +1,11 @@
-import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../../../core/audio/audio_provider.dart';
+import '../../../../core/audio/audio_models.dart';
 import '../../domain/fm_station.dart';
-import '../theme/fm_radio_theme.dart';
-import '../widgets/fm_station_artwork.dart';
-import '../widgets/live_broadcast_badge.dart';
-import '../widgets/radio_ambient_background.dart';
-import '../widgets/radio_transport_controls.dart';
-import '../widgets/radio_vu_meter.dart';
 import '../provider/fm_radio_provider.dart';
 
-/// Full-screen live station view with radio-style controls.
 class FmStationDetailScreen extends StatefulWidget {
   const FmStationDetailScreen({super.key, required this.station});
 
@@ -22,467 +15,337 @@ class FmStationDetailScreen extends StatefulWidget {
   State<FmStationDetailScreen> createState() => _FmStationDetailScreenState();
 }
 
-class _FmStationDetailScreenState extends State<FmStationDetailScreen>
-    with TickerProviderStateMixin {
-  bool _muted = false;
-  late final AnimationController _entranceController;
-  late final AnimationController _pulseController;
-  late FmRadioProvider _provider;
-
-  FmStation get _s => widget.station;
+class _FmStationDetailScreenState extends State<FmStationDetailScreen> {
+  late FmRadioProvider _radioProvider;
+  Timer? _timer;
+  int _listeningSeconds = 0;
 
   @override
   void initState() {
     super.initState();
-    _provider = context.read<FmRadioProvider>();
-    _provider.addListener(_onProviderChange);
+    _radioProvider = context.read<FmRadioProvider>();
 
-    // Entrance animation
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    // Pulse animation for artwork when playing
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _entranceController.forward();
-      // Ensure pulse syncs
-      _onProviderChange();
-    });
-  }
-
-  void _onProviderChange() {
-    if (!mounted) return;
-    if (_provider.isPlaying) {
-      if (!_pulseController.isAnimating) {
-        _pulseController.repeat(reverse: true);
+    // Start a timer to mock the live elapsed duration counter if playing
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final audioProvider = context.read<AudioProvider>();
+      final isFmPlaying = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isPlaying;
+      if (isFmPlaying) {
+        if (mounted) {
+          setState(() {
+            _listeningSeconds++;
+          });
+        }
       }
-    } else {
-      _pulseController.stop();
-      _pulseController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-      );
-    }
+    });
+
+    // Automatically trigger play if not already playing this station
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final audioProvider = context.read<AudioProvider>();
+      if (audioProvider.currentMode != AudioMode.fmRadio || audioProvider.currentStation?.id != widget.station.id) {
+        _radioProvider.playStation(widget.station);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _provider.removeListener(_onProviderChange);
-    _entranceController.dispose();
-    _pulseController.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
-  void _toggleMute() {
-    setState(() {
-      _muted = !_muted;
-    });
-    context.read<AudioProvider>().setVolume(_muted ? 0.0 : 1.0);
+  String _formatListeningTime(int totalSeconds) {
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    const maxContentWidth = 500.0;
+    final radioProvider = context.watch<FmRadioProvider>();
+    final audioProvider = context.watch<AudioProvider>();
+    final isPlaying = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isPlaying;
+    final isLoading = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isLoading;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: FmRadioTheme.deepSpace,
-        body: Consumer<FmRadioProvider>(
-          builder: (context, provider, child) {
-            final isPlaying = provider.isPlaying;
-            final isLoading = provider.isLoading;
-
-            return RadioAmbientBackground(
-              accentArgb: _s.accentColorArgb,
-              child: SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final w = constraints.maxWidth > maxContentWidth
-                        ? maxContentWidth
-                        : constraints.maxWidth;
-
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: w),
-                        child: CustomScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    IconButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).maybePop(),
-                                      icon: const Icon(
-                                        Icons.keyboard_arrow_down_rounded,
-                                        size: 32,
-                                      ),
-                                      color: Colors.white.withValues(
-                                        alpha: 0.9,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    const LiveBroadcastBadge(),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 8,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    const SizedBox(height: 12),
-                                    // Artwork Hero with Pulsing Glow
-                                    Center(
-                                      child: AnimatedBuilder(
-                                        animation: _pulseController,
-                                        builder: (context, child) {
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color:
-                                                      Color(
-                                                        _s.accentColorArgb,
-                                                      ).withValues(
-                                                        alpha:
-                                                            0.1 +
-                                                            (_pulseController
-                                                                    .value *
-                                                                0.15),
-                                                      ),
-                                                  blurRadius:
-                                                      40 +
-                                                      (_pulseController.value *
-                                                          20),
-                                                  spreadRadius:
-                                                      _pulseController.value *
-                                                      10,
-                                                ),
-                                              ],
-                                            ),
-                                            child: child,
-                                          );
-                                        },
-                                        child: FmStationArtwork(
-                                          heroTag: 'mini_${_s.id}',
-                                          stationId: _s.id,
-                                          imageUrl: _s.coverImageUrl,
-                                          size: 160,
-                                          accentArgb: _s.accentColorArgb,
-                                          showLiveHalo: true,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 32),
-                                    // Title and Text sliding up
-                                    _SlideUpElement(
-                                      controller: _entranceController,
-                                      delay: 0.2,
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            _s.name,
-                                            textAlign: TextAlign.center,
-                                            style: theme
-                                                .textTheme
-                                                .headlineMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: -0.4,
-                                                  color: Colors.white,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            _s.tagline,
-                                            textAlign: TextAlign.center,
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.7),
-                                                  height: 1.4,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.trip_origin_rounded,
-                                                size: 18,
-                                                color: Color(
-                                                  _s.accentColorArgb,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '${_s.frequencyLabel} FM',
-                                                style: theme
-                                                    .textTheme
-                                                    .titleMedium
-                                                    ?.copyWith(
-                                                      color: Color(
-                                                        _s.accentColorArgb,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      letterSpacing: 1,
-                                                    ),
-                                              ),
-                                              if (_s.listenersApprox !=
-                                                  null) ...[
-                                                const SizedBox(width: 16),
-                                                Text(
-                                                  '≈ ${_s.listenersApprox} مستمع',
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelMedium
-                                                      ?.copyWith(
-                                                        color: Colors.white54,
-                                                      ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 36),
-                                    _SlideUpElement(
-                                      controller: _entranceController,
-                                      delay: 0.4,
-                                      child: AnimatedOpacity(
-                                        opacity: isPlaying ? 1.0 : 0.4,
-                                        duration: const Duration(
-                                          milliseconds: 400,
-                                        ),
-                                        child: RadioVuMeter(
-                                          accentArgb: _s.accentColorArgb,
-                                        ),
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 28),
-                                    _SlideUpElement(
-                                      controller: _entranceController,
-                                      delay: 0.6,
-                                      child: _StreamPanel(
-                                        station: _s,
-                                        isPlaying: isPlaying,
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 36),
-                                    _SlideUpElement(
-                                      controller: _entranceController,
-                                      delay: 0.8,
-                                      child: RadioTransportControls(
-                                        playing: isPlaying,
-                                        loading: isLoading,
-                                        isMuted: _muted,
-                                        onToggleMute: _toggleMute,
-                                        onPlayPause: () =>
-                                            provider.togglePlayPause(),
-                                        onStop: () => provider.stop(),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 48),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+        backgroundColor: Colors.black,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.2,
+              colors: [
+                Color(0xFF3D1313), // Deep radiant red/brown center
+                Color(0xFF090806), // Very dark outer layer
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Premium Top Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Back Button on the far right in RTL
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+                          onPressed: () => Navigator.pop(context),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _SlideUpElement extends StatelessWidget {
-  const _SlideUpElement({
-    required this.controller,
-    required this.delay,
-    required this.child,
-  });
-
-  final AnimationController controller;
-  final double delay;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final start = delay;
-    final end = (delay + 0.4).clamp(0.0, 1.0);
-
-    final animation = CurvedAnimation(
-      parent: controller,
-      curve: Interval(start, end, curve: Curves.easeOutCubic),
-    );
-
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: animation.value,
-          child: Transform.translate(
-            offset: Offset(0, 30 * (1 - animation.value)),
-            child: child,
-          ),
-        );
-      },
-      child: child,
-    );
-  }
-}
-
-class _StreamPanel extends StatelessWidget {
-  const _StreamPanel({required this.station, required this.isPlaying});
-
-  final FmStation station;
-  final bool isPlaying;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _glassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Color(
-                      station.accentColorArgb,
-                    ).withValues(alpha: isPlaying ? 0.25 : 0.1),
-                    border: Border.all(
-                      color: Color(
-                        station.accentColorArgb,
-                      ).withValues(alpha: isPlaying ? 0.5 : 0.0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isPlaying) ...[
-                        Icon(
-                          Icons.sensors_rounded,
-                          size: 14,
-                          color: Color(station.accentColorArgb),
+                      // Screen Title in center
+                      const Text(
+                        'البث المباشر',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'ThmanyahSans',
                         ),
-                        const SizedBox(width: 4),
-                      ],
-                      Text(
-                        isPlaying ? 'بث مباشر نشط' : 'استعد للبث',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: Color(station.accentColorArgb),
-                          fontWeight: FontWeight.w800,
+                      ),
+                      // Share icon on the far left in RTL
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
+                          onPressed: () {},
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.hd_rounded,
-                  color: Colors.white.withValues(alpha: 0.45),
-                  size: 26,
-                ),
-              ],
-            ),
-          ),
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(22),
-            ),
-            child: Stack(
-              children: [
-                AspectRatio(aspectRatio: 16 / 9, child: Container()),
-                Positioned.fill(
-                  child: Image.network(
-                    station.coverImageUrl,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned.fill(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      color: FmRadioTheme.deepSpace.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Center(
-                    child: Icon(
-                      Icons.radio_rounded,
-                      size: 64,
-                      color: Colors.white.withValues(alpha: 0.2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _glassCard({required Widget child}) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        color: Colors.white.withValues(alpha: 0.03),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
+                const Spacer(),
+
+                // Retro TV/Radio Cover Frame
+                Center(
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Main Album/Radio Frame
+                      Container(
+                        width: 280,
+                        height: 280,
+                        margin: const EdgeInsets.only(top: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFF333333), width: 1.5),
+                          image: DecorationImage(
+                            image: AssetImage(widget.station.coverImageUrl.isNotEmpty 
+                                ? widget.station.coverImageUrl 
+                                : 'assets/generated/kotob_fm_logo.png'),
+                            fit: BoxFit.cover,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.15),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Glowing Red LIVE Badge overlapping top center
+                      Positioned(
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF4B4B),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF4B4B).withOpacity(0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.circle, color: Colors.white, size: 8),
+                              SizedBox(width: 6),
+                              Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  fontFamily: 'ThmanyahSans',
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Station Title & Subtitle
+                Text(
+                  widget.station.name,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'ThmanyahSans',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.station.tagline,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 14,
+                    fontFamily: 'ThmanyahSans',
+                  ),
+                ),
+
+                const Spacer(flex: 2),
+
+                // Custom Red Progress Bar Slider
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4.0,
+                          activeTrackColor: const Color(0xFFFF4B4B),
+                          inactiveTrackColor: Colors.white.withOpacity(0.1),
+                          thumbColor: const Color(0xFFFF4B4B),
+                          overlayColor: const Color(0xFFFF4B4B).withOpacity(0.2),
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                        ),
+                        child: Slider(
+                          value: isPlaying ? 0.75 : 0.0,
+                          onChanged: (val) {},
+                        ),
+                      ),
+                      // Timing indicator Row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // "LIVE" status on the right (RTL layout)
+                            const Row(
+                              children: [
+                                Icon(Icons.circle, color: Color(0xFFFF4B4B), size: 8),
+                                SizedBox(width: 6),
+                                Text(
+                                  'مباشر',
+                                  style: TextStyle(
+                                    color: Color(0xFFFF4B4B),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    fontFamily: 'ThmanyahSans',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Elapsed duration on the left (RTL layout)
+                            Text(
+                              isPlaying ? _formatListeningTime(_listeningSeconds) : '00:00',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontFamily: 'ThmanyahSans',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Controls: Backward 10s, Play/Pause/Stop, Forward 10s
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Backward 10s button
+                    IconButton(
+                      icon: const Icon(Icons.replay_10_rounded),
+                      color: Colors.white54,
+                      iconSize: 32,
+                      onPressed: () {},
+                    ),
+                    const SizedBox(width: 32),
+                    // Main Play/Stop Button
+                    GestureDetector(
+                      onTap: () {
+                        if (isPlaying) {
+                          radioProvider.stop();
+                        } else {
+                          radioProvider.playStation(widget.station);
+                        }
+                      },
+                      child: Container(
+                        width: 76,
+                        height: 76,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF4B4B),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: isLoading
+                              ? const CircularProgressIndicator(color: Colors.black)
+                              : Icon(
+                                  isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                                  color: Colors.black,
+                                  size: 38,
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                    // Forward 10s button
+                    IconButton(
+                      icon: const Icon(Icons.forward_10_rounded),
+                      color: Colors.white54,
+                      iconSize: 32,
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 48),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
-      child: child,
     );
   }
 }

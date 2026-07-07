@@ -1,8 +1,23 @@
+import 'dart:convert';
+
+const String _chapterOneSilentWallsAudioUrl =
+    'https://firebasestorage.googleapis.com/v0/b/kutubfm-1ef89.firebasestorage.app/o/002.%20%D8%A7%D9%84%D8%AC%D8%B2%D8%A1%20%D8%A7%D9%84%D8%A7%D9%94%D9%88%D9%84%20%D8%B3%D9%83%D9%88%D9%86%20%D8%A7%D9%84%D8%B4%D8%AA%D8%A7%D8%A1%20%D8%A7%D9%84%D9%81%D8%B5%D9%84%20%D8%A7%D9%84%D8%A7%D9%94%D9%88%D9%84%20%D8%A7%D9%84%D8%A8%D9%8A%D8%AA%20%D8%B0%D9%88%20%D8%A7%D9%84%D8%AC%D8%AF%D8%B1%D8%A7%D9%86%20%D8%A7%D9%84%D8%B5%D8%A7%D9%85%D8%AA%D8%A9.mp3?alt=media&token=a72ee120-f56d-4972-980a-ebaf1ea0c9b5';
+
+const String _chapterTwoScreenLightAudioUrl =
+    'https://firebasestorage.googleapis.com/v0/b/kutubfm-1ef89.firebasestorage.app/o/003.%20%D8%A7%D9%84%D9%81%D8%B5%D9%84%20%D8%A7%D9%84%D8%AB%D8%A7%D9%86%D9%8A%20%D8%B6%D9%88%D8%A1%20%D8%B9%D8%A8%D8%B1%20%D8%A7%D9%84%D8%B4%D8%A7%D8%B4%D8%A9.mp3?alt=media&token=1868d5f1-7718-4d25-9045-7f5a6a359ccc';
+
+const String _chapterThreeDinnerShadowsAudioUrl =
+    'https://firebasestorage.googleapis.com/v0/b/kutubfm-1ef89.firebasestorage.app/o/004.%20%D8%A7%D9%84%D9%81%D8%B5%D9%84%20%D8%A7%D9%84%D8%AB%D8%A7%D9%84%D8%AB%20%D8%B8%D9%84%D8%A7%D9%84%20%D8%B9%D9%84%D9%89%20%D9%85%D8%A7%D9%8A%D9%94%D8%AF%D8%A9%20%D8%A7%D9%84%D8%B9%D8%B4%D8%A7%D8%A1.mp3?alt=media&token=6233a477-f851-4857-b9f3-3b6730ae13c1';
+
+const String _camelliaFlowerPdfUrl =
+    'https://firebasestorage.googleapis.com/v0/b/kutubfm-1ef89.firebasestorage.app/o/%D8%B2%D9%87%D8%B1%D8%A9%20%D8%A7%D9%84%D9%83%D8%A7%D9%85%D9%8A%D9%84%D9%8A%D8%A7-%20%D8%A7%D9%84%D9%86%D8%B3%D8%AE%D8%A9%20%D8%A7%D9%84%D9%86%D9%87%D8%A7%D9%8A%D9%94%D9%8A%D8%A9.pdf?alt=media&token=c4dd08dd-ef21-464a-9f24-7c376aa16a51';
+
 class Chapter {
   final String id;
   final String title;
   final String duration;
   final String audioUrl;
+  final String? youtubeUrl;
   final int orderIndex;
   final bool isCompleted;
   final String? transcript;
@@ -12,23 +27,169 @@ class Chapter {
     required this.title,
     required this.duration,
     required this.audioUrl,
+    this.youtubeUrl,
     required this.orderIndex,
     this.isCompleted = false,
     this.transcript,
   });
 
   factory Chapter.fromFirestore(Map<String, dynamic> data, String docId) {
+    final title = data['title'] as String? ?? '';
+    final ytUrl = _readString(data, const [
+      'youtubeUrl',
+      'youtubeURL',
+      'youtube_url',
+    ]);
+    final fallbackAudioUrl = _readString(data, const [
+      'downloadUrl',
+      'downloadURL',
+      'download_url',
+      'audioDownloadUrl',
+      'audio_download_url',
+      'audioUrl',
+      'audio_url',
+      'streamUrl',
+      'stream_url',
+      'url',
+    ]);
+    final orderIndex = (data['orderIndex'] is int)
+        ? data['orderIndex'] as int
+        : int.tryParse(data['orderIndex']?.toString() ?? '') ?? 0;
+    final audioUrlOverride = _knownAudioUrlOverride(
+      docId: docId,
+      title: title,
+      orderIndex: orderIndex,
+      hasExistingAudio: ytUrl.isNotEmpty || fallbackAudioUrl.isNotEmpty,
+    );
     return Chapter(
       id: docId,
-      title: data['title'] as String? ?? '',
+      title: title,
       duration: data['duration'] as String? ?? '',
-      audioUrl: data['audioUrl'] as String? ?? '',
-      orderIndex: (data['orderIndex'] is int)
-          ? data['orderIndex'] as int
-          : int.tryParse(data['orderIndex']?.toString() ?? '') ?? 0,
+      audioUrl:
+          audioUrlOverride ?? (ytUrl.isNotEmpty ? ytUrl : fallbackAudioUrl),
+      youtubeUrl: audioUrlOverride == null && ytUrl.isNotEmpty ? ytUrl : null,
+      orderIndex: orderIndex,
       isCompleted: false,
-      transcript: data['transcript'] as String?,
+      transcript: _readTranscript(data['transcript']),
     );
+  }
+
+  bool get hasTranscript => transcript?.trim().isNotEmpty == true;
+
+  bool get hasAudioUrl => audioUrl.trim().isNotEmpty;
+
+  bool get hasYoutubeUrl => youtubeUrl != null && youtubeUrl!.trim().isNotEmpty;
+
+  bool get isReadableAudio => hasTranscript && (hasYoutubeUrl || hasAudioUrl);
+
+  static String? _knownAudioUrlOverride({
+    required String docId,
+    required String title,
+    required int orderIndex,
+    required bool hasExistingAudio,
+  }) {
+    final normalized = _normalizeArabic('$docId $title');
+    final titleAudioOverrides = <String, String>{
+      _normalizeArabic('البيت ذو الجدران الصامتة'):
+          _chapterOneSilentWallsAudioUrl,
+      _normalizeArabic('ضوء عبر الشاشة'): _chapterTwoScreenLightAudioUrl,
+      _normalizeArabic('ظلال على مائدة العشاء'):
+          _chapterThreeDinnerShadowsAudioUrl,
+    };
+    for (final entry in titleAudioOverrides.entries) {
+      if (normalized.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    if (hasExistingAudio) {
+      return null;
+    }
+
+    if (_isChapterMatch(
+      normalized: normalized,
+      orderIndex: orderIndex,
+      expectedOrder: 1,
+      arabicTitle: 'الفصل الأول',
+      englishMarkers: const ['chapter1', 'ch1'],
+    )) {
+      return _chapterOneSilentWallsAudioUrl;
+    }
+
+    if (_isChapterMatch(
+      normalized: normalized,
+      orderIndex: orderIndex,
+      expectedOrder: 2,
+      arabicTitle: 'الفصل الثاني',
+      englishMarkers: const ['chapter2', 'ch2'],
+    )) {
+      return _chapterTwoScreenLightAudioUrl;
+    }
+
+    if (_isChapterMatch(
+      normalized: normalized,
+      orderIndex: orderIndex,
+      expectedOrder: 3,
+      arabicTitle: 'الفصل الثالث',
+      englishMarkers: const ['chapter3', 'ch3'],
+    )) {
+      return _chapterThreeDinnerShadowsAudioUrl;
+    }
+
+    return null;
+  }
+
+  static bool _isChapterMatch({
+    required String normalized,
+    required int orderIndex,
+    required int expectedOrder,
+    required String arabicTitle,
+    required List<String> englishMarkers,
+  }) {
+    final compact = normalized.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    if (orderIndex == expectedOrder) {
+      return true;
+    }
+    if (normalized.contains(_normalizeArabic(arabicTitle))) {
+      return true;
+    }
+    return englishMarkers.any(compact.contains);
+  }
+
+  static String _normalizeArabic(String value) {
+    return value
+        .trim()
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
+        .replaceAll('ئ', 'ي')
+        .replaceAll('ؤ', 'و')
+        .replaceAll('ى', 'ي')
+        .replaceAll('ة', 'ه')
+        .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
+  }
+
+  static String? _readTranscript(Object? value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    if (value is Map || value is List) {
+      return jsonEncode(value);
+    }
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _readString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 }
 
@@ -75,6 +236,7 @@ class BookDetail {
   final String publisherId;
   final String publisherName;
   final String audioUrl;
+  final String pdfUrl;
 
   BookDetail({
     required this.id,
@@ -101,6 +263,7 @@ class BookDetail {
     required this.publisherId,
     required this.publisherName,
     required this.audioUrl,
+    required this.pdfUrl,
   });
 
   factory BookDetail.fromFirestore(
@@ -151,10 +314,12 @@ class BookDetail {
     final pages = (data['pages'] is int)
         ? data['pages'] as int
         : int.tryParse(data['pages']?.toString() ?? '') ?? 0;
+    final title = data['title'] as String? ?? '';
+    final pdfUrlOverride = _knownPdfUrlOverride(docId: docId, title: title);
 
     return BookDetail(
       id: docId,
-      title: data['title'] as String? ?? '',
+      title: title,
       author: authorName.isNotEmpty ? authorName : 'غير معروف',
       authorId: authorId,
       authorFullNameRussian: authorFullNameRussian,
@@ -179,7 +344,24 @@ class BookDetail {
           data['publisherNameSnapshot'] as String? ??
           data['publisher'] as String? ??
           '',
-      audioUrl: data['audioUrl'] as String? ?? '',
+      audioUrl: _readString(data, const [
+        'downloadUrl',
+        'downloadURL',
+        'download_url',
+        'audioDownloadUrl',
+        'audio_download_url',
+        'audioUrl',
+        'audio_url',
+      ]),
+      pdfUrl:
+          pdfUrlOverride ??
+          _readString(data, const [
+            'pdfUrl',
+            'pdfURL',
+            'pdf_url',
+            'pdfDownloadUrl',
+            'pdf_download_url',
+          ]),
     );
   }
 
@@ -203,7 +385,7 @@ class BookDetail {
           id: 'ch1',
           title: 'الفصل الأول',
           duration: '45:00',
-          audioUrl: '',
+          audioUrl: _chapterOneSilentWallsAudioUrl,
           orderIndex: 1,
           isCompleted: true,
           transcript: 'الفصل الأول من رواية مئة عام من العزلة...',
@@ -212,7 +394,7 @@ class BookDetail {
           id: 'ch2',
           title: 'الفصل الثاني',
           duration: '50:00',
-          audioUrl: '',
+          audioUrl: _chapterTwoScreenLightAudioUrl,
           orderIndex: 2,
           isCompleted: true,
           transcript: 'الفصل الثاني من رواية مئة عام من العزلة...',
@@ -221,7 +403,7 @@ class BookDetail {
           id: 'ch3',
           title: 'الفصل الثالث',
           duration: '43:00',
-          audioUrl: '',
+          audioUrl: _chapterThreeDinnerShadowsAudioUrl,
           orderIndex: 3,
           transcript: 'الفصل الثالث من رواية مئة عام من العزلة...',
         ),
@@ -255,7 +437,8 @@ class BookDetail {
           id: '101',
           userName: 'سامر العلي',
           userAvatar: '',
-          text: 'رواية استثنائية، أعادت تشكيل نظرتي للوزارة والوجود أسلوب ساحر ومترجم بشكل رائع، أنصح بها بشدة.',
+          text:
+              'رواية استثنائية، أعادت تشكيل نظرتي للوزارة والوجود أسلوب ساحر ومترجم بشكل رائع، أنصح بها بشدة.',
           timeAgo: '24/5/2026',
           likes: 24,
         ),
@@ -263,7 +446,8 @@ class BookDetail {
           id: '102',
           userName: 'ليلى حسن',
           userAvatar: '',
-          text: 'قصة عميقة تحمل بين طياتها مشاعر صادقة وأحداث مشوقة، لا يمكنني الانتظار لقراءة المزيد من...',
+          text:
+              'قصة عميقة تحمل بين طياتها مشاعر صادقة وأحداث مشوقة، لا يمكنني الانتظار لقراءة المزيد من...',
           timeAgo: '15/6/2026',
           likes: 12,
         ),
@@ -278,6 +462,7 @@ class BookDetail {
       publisherId: 'publisher_dar_al_shorouk',
       publisherName: 'الدار العربية للعلوم ناشرون',
       audioUrl: '',
+      pdfUrl: '',
     );
   }
 
@@ -301,6 +486,17 @@ class BookDetail {
       'publisher.id',
       'publisherRef',
     ]);
+  }
+
+  static String? _knownPdfUrlOverride({
+    required String docId,
+    required String title,
+  }) {
+    final normalized = Chapter._normalizeArabic('$docId $title');
+    if (normalized.contains(Chapter._normalizeArabic('زهرة الكاميليا'))) {
+      return _camelliaFlowerPdfUrl;
+    }
+    return null;
   }
 
   static String _readString(Map<String, dynamic> data, List<String> keys) {

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/storage/firebase_storage_url_resolver.dart';
 import '../../domain/entities/book_detail_model.dart';
 import '../../domain/repositories/book_details_repository.dart';
 
@@ -31,6 +32,21 @@ class BookDetailsRepositoryImpl implements BookDetailsRepository {
     // Sort chapters by orderIndex
     chapters.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
 
-    return BookDetail.fromFirestore(data, bookDoc.id, chapters);
+    final resolvedData = Map<String, dynamic>.from(data);
+    resolvedData['imageUrl'] = await FirebaseStorageUrlResolver.resolve(
+      _readString(data, const ['imageUrl', 'coverUrl', 'cover_url']),
+    );
+
+    return BookDetail.fromFirestore(resolvedData, bookDoc.id, chapters);
+  }
+
+  String _readString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 }

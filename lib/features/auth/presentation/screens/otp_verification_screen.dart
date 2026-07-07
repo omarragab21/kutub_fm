@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/auth_background.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({super.key});
@@ -12,9 +14,11 @@ class OtpVerificationScreen extends StatefulWidget {
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _otpController = TextEditingController();
-  bool _autovalidate = false;
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _navigated = false;
   String? _lastErrorMessage;
   AuthProvider? _authProvider;
@@ -33,7 +37,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   @override
   void dispose() {
     _authProvider?.removeListener(_onAuthStateChanged);
-    _otpController.dispose();
+    for (var controller in _controllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -58,27 +67,34 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       );
     } else if (provider.status == AuthStatus.authenticated && !_navigated) {
       _navigated = true;
-      final nextRoute = provider.isCategorySelectionCompleted
-          ? AppRoutes.home
-          : AppRoutes.categorySelection;
-      Navigator.pushNamedAndRemoveUntil(context, nextRoute, (_) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.authSuccess,
+        (_) => false,
+      );
     }
+  }
+
+  String _getOtp() {
+    return _controllers.map((c) => c.text.trim()).join();
   }
 
   Future<void> _verifyOtp() async {
     FocusScope.of(context).unfocus();
 
-    if (!_autovalidate) {
-      setState(() {
-        _autovalidate = true;
-      });
+    final otp = _getOtp();
+    if (otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('برجاء إدخال كود التحقق كاملاً (6 أرقام)'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
     }
 
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final smsCode = _otpController.text.trim();
     _lastErrorMessage = null;
-    await context.read<AuthProvider>().verifyPhoneOtp(smsCode);
+    await context.read<AuthProvider>().verifyPhoneOtp(otp);
   }
 
   Future<void> _resendOtp() async {
@@ -102,167 +118,177 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final isLoading = authProvider.status == AuthStatus.loading;
     final pendingPhone = authProvider.pendingPhoneNumber ?? '';
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: _autovalidate
-                      ? AutovalidateMode.onUserInteraction
-                      : AutovalidateMode.disabled,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(
-                        Icons.security_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 72,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'تأكيد رقم الهاتف',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.displayLarge?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'أدخل كود التحقق المكون من 6 أرقام المرسل إلى الرقم\n$pendingPhone',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      TextFormField(
-                        controller: _otpController,
-                        keyboardType: TextInputType.number,
-                        textDirection: TextDirection.ltr,
-                        maxLength: 6,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          letterSpacing: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: _inputDecoration(
-                          context,
-                          label: 'رمز التحقق',
-                          hint: '******',
-                          icon: Icons.lock_open_rounded,
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'برجاء إدخال رمز التحقق';
-                          }
-                          if (value.trim().length != 6) {
-                            return 'يجب أن يتكون رمز التحقق من 6 أرقام';
-                          }
-                          if (int.tryParse(value.trim()) == null) {
-                            return 'رمز التحقق يجب أن يحتوي على أرقام فقط';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: isLoading ? null : _verifyOtp,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                ),
-                              )
-                            : const Text(
-                                'تأكيد الدخول',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 16),
-                      OutlinedButton(
-                        onPressed: isLoading ? null : _resendOtp,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(54),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'إعادة إرسال كود التحقق',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+      child: AuthBackground(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'تأكيد رقم الهاتف',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'أدخل كود التحقق المكون من 6 أرقام إلى رقم:\n\u200e$pendingPhone',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            // 6-digit OTP fields
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildPinField(0),
+                SizedBox(width: 5.w),
+                _buildPinField(1),
+                SizedBox(width: 5.w),
+                _buildPinField(2),
+                SizedBox(width: 10.w),
+                Container(
+                  width: 19.w,
+                  height: 1.h,
+                  color: const Color.fromRGBO(217, 217, 217, 1),
+                ),
+                SizedBox(width: 10.w),
+                _buildPinField(3),
+                SizedBox(width: 5.w),
+                _buildPinField(4),
+                SizedBox(width: 5.w),
+                _buildPinField(5),
+              ],
+            ),
+            const SizedBox(height: 32),
+            // Yellow Button "إرسال كود التحقق"
+            SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: isLoading ? null : _verifyOtp,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFC00E),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.black,
+                        ),
+                      )
+                    : const Text(
+                        'إرسال كود التحقق',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Black/Outline Button: إعادة إرسال الكود
+            SizedBox(
+              height: 52,
+              child: OutlinedButton(
+                onPressed: isLoading ? null : _resendOtp,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white24, width: 1.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'إعادة إرسال الكود',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 20),
+            // Footer link: عودة للخلف
+            Center(
+              child: TextButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: Colors.white70,
+                ),
+                label: const Text(
+                  'عودة للخلف',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(
-    BuildContext context, {
-    required String label,
-    required String hint,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      prefixIcon: Icon(icon),
-      filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.35,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
-      floatingLabelBehavior: FloatingLabelBehavior.always,
-      hintStyle: TextStyle(
-        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-        letterSpacing: 0,
+  Widget _buildPinField(int index) {
+    return SizedBox(
+      width: 44.w,
+      height: 44.w,
+      child: TextFormField(
+        controller: _controllers[index],
+        focusNode: _focusNodes[index],
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Color.fromRGBO(238, 238, 238, 1),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+        maxLength: 1,
+        decoration: InputDecoration(
+          counterText: '',
+          filled: true,
+          fillColor: Colors.black,
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white, width: 1.0),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white, width: 1.0),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white, width: 1.0),
+          ),
+        ),
+        onChanged: (value) {
+          if (value.isNotEmpty) {
+            if (index < 5) {
+              _focusNodes[index + 1].requestFocus();
+            } else {
+              _focusNodes[index].unfocus();
+            }
+          } else {
+            if (index > 0) {
+              _focusNodes[index - 1].requestFocus();
+            }
+          }
+        },
       ),
     );
   }

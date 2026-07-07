@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/user_profile.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -22,7 +22,8 @@ class EditProfileScreen extends StatefulWidget {
     List<int> weeklyActivityMinutes,
     List<ContinueListeningItem> continueListening,
     File? newProfileImage,
-  ) onSave;
+  )
+  onSave;
 
   const EditProfileScreen({
     super.key,
@@ -37,13 +38,8 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  late TextEditingController _bioController;
-  late List<String> _selectedCategories;
-
-  List<String> _allCategories = [];
-  bool _isLoadingCategories = true;
-  String? _categoriesError;
 
   File? _newProfileImage;
   bool _isSaving = false;
@@ -52,55 +48,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.profile.name);
+    _phoneController = TextEditingController(
+      text: '01050084024',
+    ); // Mock phone number to match design
     _emailController = TextEditingController(text: widget.profile.email);
-    _bioController = TextEditingController(text: widget.profile.bio ?? '');
-    _selectedCategories = List.from(widget.profile.favoriteCategories);
-    _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    setState(() {
-      _isLoadingCategories = true;
-      _categoriesError = null;
-    });
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('categories')
-          .orderBy('createdAt')
-          .get();
-      
-      final categories = snapshot.docs.map((doc) {
-        final data = doc.data();
-        for (final key in const ['name', 'title', 'nameAr', 'arabicName']) {
-          final val = data[key];
-          if (val is String && val.trim().isNotEmpty) {
-            return val.trim();
-          }
-        }
-        return doc.id;
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          _allCategories = categories;
-          _isLoadingCategories = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _categoriesError = 'تعذر تحميل التصنيفات';
-          _isLoadingCategories = false;
-        });
-      }
-    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
-    _bioController.dispose();
     super.dispose();
   }
 
@@ -125,8 +83,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await widget.onSave(
       _nameController.text.trim(),
       _emailController.text.trim(),
-      _bioController.text.trim(),
-      _selectedCategories,
+      widget.profile.bio ?? '',
+      widget.profile.favoriteCategories,
       widget.profile.totalBooksListened,
       widget.profile.totalListeningMinutes,
       widget.profile.favoritesCount,
@@ -141,262 +99,184 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'تعديل الملف الشخصي',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
-          children: [
-            // Avatar placeholder
-            Center(
-              child: Stack(
-                children: [
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: CircleAvatar(
-                      radius: 52,
-                      backgroundColor: AppTheme.surfaceContainerHighest,
-                      backgroundImage: _newProfileImage != null
-                          ? FileImage(_newProfileImage!) as ImageProvider
-                          : (widget.profile.avatarUrl != null && widget.profile.avatarUrl!.isNotEmpty)
-                              ? NetworkImage(widget.profile.avatarUrl!)
-                              : null,
-                      child: (_newProfileImage == null && (widget.profile.avatarUrl == null || widget.profile.avatarUrl!.isEmpty))
-                          ? Text(
-                              _initials(_nameController.text),
-                              style: const TextStyle(
-                                color: AppTheme.primary,
-                                fontSize: 34,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF040707),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
                     ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.black,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 36),
-
-            // Name field
-            _buildLabel('الاسم'),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _nameController,
-              hint: 'اكتب اسمك',
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'الاسم مطلوب';
-                if (v.trim().length < 3) return 'الاسم قصير جداً';
-                return null;
-              },
-              onChanged: (_) => setState(() {}), // refresh initials
-            ),
-            const SizedBox(height: 20),
-
-            // Email field
-            _buildLabel('البريد الإلكتروني'),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _emailController,
-              hint: 'اكتب بريدك الإلكتروني',
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'البريد الإلكتروني مطلوب';
-                if (!v.contains('@')) return 'بريد إلكتروني غير صالح';
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-
-            // Bio field
-            _buildLabel('نبذة شخصية'),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _bioController,
-              hint: 'أخبرنا شيئاً عن نفسك...',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 28),
-
-            // Category chips
-            _buildLabel('اهتماماتي'),
-            const SizedBox(height: 12),
-            if (_isLoadingCategories)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
-                  ),
-                ),
-              )
-            else if (_categoriesError != null)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
                     children: [
-                      Text(
-                        _categoriesError!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 14),
-                      ),
+                      const SizedBox(height: 20),
+                      _buildAvatarSection(),
+                      const SizedBox(height: 48),
+                      _buildLabel('اسم المستخدم'),
                       const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _loadCategories,
-                        icon: const Icon(Icons.refresh, color: AppTheme.primary),
-                        label: const Text(
-                          'إعادة المحاولة',
-                          style: TextStyle(color: AppTheme.primary),
-                        ),
+                      _buildTextField(
+                        controller: _nameController,
+                        hint: 'رامي عامر',
+                      ),
+                      const SizedBox(height: 24),
+                      _buildLabel('رقم الهاتف'),
+                      const SizedBox(height: 8),
+                      _buildTextField(
+                        controller: _phoneController,
+                        hint: '01050084024',
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 24),
+                      _buildLabel('البريد الإلكتروني'),
+                      const SizedBox(height: 8),
+                      _buildTextField(
+                        controller: _emailController,
+                        hint: 'example@gmail.com',
+                        keyboardType: TextInputType.emailAddress,
                       ),
                     ],
                   ),
                 ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _allCategories.map((cat) {
-                  final isSelected = _selectedCategories.contains(cat);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedCategories.remove(cat);
-                        } else {
-                          _selectedCategories.add(cat);
-                        }
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppTheme.primary.withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppTheme.primary
-                              : Colors.white.withValues(alpha: 0.12),
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          color: isSelected ? AppTheme.primary : Colors.white60,
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
               ),
-          ],
-        ),
-      ),
-      // Sticky Save Button
-      bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          16,
-          24,
-          MediaQuery.of(context).padding.bottom + 16,
-        ),
-        decoration: BoxDecoration(
-          color: const Color(0xFF111111),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 20,
-              offset: const Offset(0, -8),
-            ),
-          ],
-        ),
-        child: SizedBox(
-          height: 54,
-          child: ElevatedButton(
-            onPressed: _isSaving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(27),
-              ),
-              elevation: 0,
-            ),
-            child: _isSaving
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.black,
-                    ),
-                  )
-                : const Text(
-                    'حفظ التغييرات',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left side: Save Button
+          GestureDetector(
+            onTap: _isSaving ? null : _save,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFBD10),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : Text(
+                      'حفظ',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFF1F1F1F),
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+            ),
+          ),
+          // Right side: Back Button
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 41,
+              height: 41,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1F1F1F),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/profile/imgVector12.svg',
+                  width: 24,
+                  height: 24,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarSection() {
+    return Center(
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              width: 109,
+              height: 109,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFFFF675),
+              ),
+              child: ClipOval(
+                child: _newProfileImage != null
+                    ? Image.file(_newProfileImage!, fit: BoxFit.cover)
+                    : Image.asset(
+                        'assets/profile/imgAvatar.png',
+                        fit: BoxFit.cover,
+                      ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.camera_alt_outlined,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.6),
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'ThmanyahSans',
+          color: const Color(0xFFBDBDBD),
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w400,
+        ),
       ),
     );
   }
@@ -404,55 +284,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
-    int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
-      validator: validator,
-      onChanged: onChanged,
-      maxLines: maxLines,
       keyboardType: keyboardType,
-      textDirection: TextDirection.rtl,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      style: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        color: Colors.white,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.06),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 14,
+        hintStyle: const TextStyle(
+          fontFamily: 'ThmanyahSans',
+          color: Colors.white24,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+        filled: true,
+        fillColor: const Color(0xFF040707),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: AppTheme.primary.withValues(alpha: 0.6),
-            width: 1.5,
-          ),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFFFBD10), width: 1.5),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-        ),
-        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}';
-    return parts[0].isNotEmpty ? parts[0][0] : '?';
   }
 }

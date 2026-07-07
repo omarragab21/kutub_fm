@@ -12,6 +12,20 @@ class ReelsViewModel extends ChangeNotifier {
   int _currentIndex = 0;
   bool _isLoading = false;
   StreamSubscription<QuerySnapshot>? _reelsSubscription;
+  bool _isPageActive = false;
+
+  bool get isPageActive => _isPageActive;
+
+  void setPageActive(bool active) {
+    if (_isPageActive == active) return;
+    _isPageActive = active;
+    if (_isPageActive) {
+      _controllers[_currentIndex]?.play();
+    } else {
+      _controllers[_currentIndex]?.pause();
+    }
+    notifyListeners();
+  }
   PageController? _pageController;
 
   /// Cache of pre-warmed VideoPlayerControllers keyed by reel index.
@@ -147,8 +161,8 @@ class ReelsViewModel extends ChangeNotifier {
       controller.setLooping(true);
       _initialized[index] = true;
 
-      // Auto-play if this turned out to be the current index
-      if (index == _currentIndex) {
+      // Auto-play if this turned out to be the current index and tab is active
+      if (index == _currentIndex && _isPageActive) {
         controller.play();
       }
       notifyListeners();

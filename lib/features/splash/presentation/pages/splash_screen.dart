@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/kotob_fm_logo.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       final route = switch (status) {
-        AuthStatus.guest => AppRoutes.home,
+        AuthStatus.guest => AppRoutes.login,
         AuthStatus.authenticated =>
           context.read<AuthProvider>().isCategorySelectionCompleted
               ? AppRoutes.home
@@ -80,51 +81,8 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        theme.colorScheme.primary,
-                        theme.colorScheme.primaryContainer,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.15,
-                        ),
-                        blurRadius: 32,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.menu_book,
-                      size: 64,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 48),
-                ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (bounds) => LinearGradient(
-                    colors: [
-                      theme.colorScheme.primary,
-                      theme.colorScheme.primaryContainer,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  child: Text('كتب FM', style: theme.textTheme.displayLarge),
-                ),
-                const SizedBox(height: 16),
+                const KotobFMLogo(height: 90),
+                const SizedBox(height: 24),
                 Text(
                   'THE DIGITAL CURATOR',
                   style: theme.textTheme.bodyMedium?.copyWith(

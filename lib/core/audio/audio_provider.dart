@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+
 import '../../features/audio_player/data/models/transcript_segment.dart';
 import '../../features/audio_player/data/services/transcript_asset_loader.dart';
 import '../../features/audio_player/domain/entities/audio_story.dart';
@@ -42,6 +43,7 @@ class AudioProvider extends ChangeNotifier {
   String? _currentBookId;
   Timer? _listeningTimer;
   int _accumulatedSeconds = 0;
+
 
   AudioState get state => _audioService.state;
   AudioMode get currentMode => state.mode;
@@ -105,6 +107,7 @@ class AudioProvider extends ChangeNotifier {
   String? get currentReadingChapterId => _currentReadingChapterId;
   String? get currentReadingBookTitle => _currentReadingBookTitle;
   String? get currentPodcastEpisodeId => _currentPodcastEpisodeId;
+  String? get currentBookId => _currentBookId;
   int get currentPositionSeconds => currentPosition.inSeconds;
   int get totalDurationSeconds {
     if (duration > Duration.zero) {
@@ -170,15 +173,13 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
-    // Local fallback commented out; loading directly from URL
-    // final isUrl = story.audioUrl != null &&
-    //     (story.audioUrl!.startsWith('http://') ||
-    //         story.audioUrl!.startsWith('https://'));
-    // final source = isUrl ? story.audioUrl! : _spokenWordAssetPath;
-    // final inputType = isUrl ? AudioInputType.uri : AudioInputType.asset;
-    final source = (story.audioUrl != null && story.audioUrl!.isNotEmpty)
-        ? story.audioUrl!
-        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    final rawSource = story.audioUrl?.trim();
+    if (rawSource == null || rawSource.isEmpty) {
+      debugPrint('Audio URL is empty for story ${story.id}.');
+      notifyListeners();
+      return;
+    }
+    final source = rawSource;
     const inputType = AudioInputType.uri;
 
     try {
@@ -216,11 +217,18 @@ class AudioProvider extends ChangeNotifier {
     bool autoplay = true,
     Duration initialPosition = Duration.zero,
   }) async {
+    final rawSource = audioUrl?.trim();
+    if (rawSource == null || rawSource.isEmpty) {
+      debugPrint('Reading audio URL is empty for book $bookId.');
+      notifyListeners();
+      return;
+    }
+
     _currentStation = null;
     _currentReadingBookId = bookId;
     _currentReadingChapterId = chapterId;
     _currentReadingBookTitle = title;
-    _currentReadingBookAudioUrl = audioUrl;
+    _currentReadingBookAudioUrl = rawSource;
     _currentBookId = bookId;
     _markBookAsListened(bookId);
 
@@ -235,10 +243,7 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
-    // Local fallback commented out; loading directly from URL
-    final source = (audioUrl != null && audioUrl.isNotEmpty)
-        ? audioUrl
-        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    final source = rawSource;
     const inputType = AudioInputType.uri;
 
     try {
@@ -276,13 +281,28 @@ class AudioProvider extends ChangeNotifier {
     bool autoplay = true,
     Duration initialPosition = Duration.zero,
   }) async {
+    if (!chapter.isReadableAudio) {
+      debugPrint('Chapter ${chapter.id} is missing transcript or audio URL.');
+      notifyListeners();
+      return;
+    }
+
+    final availableChapters = chapters
+        .where((ch) => ch.isReadableAudio)
+        .toList(growable: false);
+    if (availableChapters.isEmpty) {
+      debugPrint('No playable chapters available for book $bookId.');
+      notifyListeners();
+      return;
+    }
+
     _clearReadingContext();
     _currentStation = null;
     _currentBookId = bookId;
     _markBookAsListened(bookId);
 
     // Convert all chapters to AudioStory entities
-    final chaptersStories = chapters.map((ch) {
+    final chaptersStories = availableChapters.map((ch) {
       return AudioStory(
         id: ch.id,
         title: ch.title,
@@ -296,6 +316,7 @@ class AudioProvider extends ChangeNotifier {
         shares: 0,
         saves: 0,
         audioUrl: ch.audioUrl,
+        transcript: ch.transcript,
       );
     }).toList();
 
@@ -306,15 +327,6 @@ class AudioProvider extends ChangeNotifier {
     if (idx != -1) {
       _currentIndex = idx;
     }
-
-    // Local fallback commented out; loading directly from URL
-    // final isUrl = chapter.audioUrl.startsWith('http://') || chapter.audioUrl.startsWith('https://');
-    // final source = isUrl ? chapter.audioUrl : _spokenWordAssetPath;
-    // final inputType = isUrl ? AudioInputType.uri : AudioInputType.asset;
-    final source = chapter.audioUrl.isNotEmpty
-        ? chapter.audioUrl
-        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-    const inputType = AudioInputType.uri;
 
     if (isActiveChapter(chapter.id)) {
       if (initialPosition != Duration.zero) {
@@ -327,12 +339,30 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
+    // Extract audio source — prefer YouTube URL extraction, fall back to audioUrl
+    String source = chapter.audioUrl;
+    if (chapter.hasYoutubeUrl) {
+      final yt = yt_explode.YoutubeExplode();
+      try {
+        final videoId = YoutubePlayer.convertUrlToId(chapter.youtubeUrl!);
+        if (videoId != null) {
+          final manifest = await yt.videos.streamsClient.getManifest(videoId);
+          final streamInfo = manifest.audioOnly.withHighestBitrate();
+          source = streamInfo.url.toString();
+        }
+      } catch (e) {
+        debugPrint('Error extracting YouTube audio for chapter ${chapter.id}: $e');
+      } finally {
+        yt.close();
+      }
+    }
+
     try {
       await _audioService.loadTrack(
         AudioTrack(
           id: chapter.id,
           mode: AudioMode.audiobook,
-          inputType: inputType,
+          inputType: AudioInputType.uri,
           source: source,
           title: chapter.title,
           artist: author ?? 'غير معروف',
@@ -584,13 +614,16 @@ class AudioProvider extends ChangeNotifier {
     if (user == null || user.isAnonymous) return;
 
     try {
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final snapshot = await transaction.get(userDocRef);
         if (!snapshot.exists) return;
 
         final data = snapshot.data()!;
-        final currentMinutes = (data['totalListeningMinutes'] as num?)?.toInt() ?? 0;
+        final currentMinutes =
+            (data['totalListeningMinutes'] as num?)?.toInt() ?? 0;
         final newMinutes = currentMinutes + 1;
 
         List<int> weekly = const [0, 0, 0, 0, 0, 0, 0];
@@ -619,8 +652,12 @@ class AudioProvider extends ChangeNotifier {
     if (user == null || user.isAnonymous) return;
 
     try {
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final listenedDocRef = userDocRef.collection('listened_books').doc(bookId);
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      final listenedDocRef = userDocRef
+          .collection('listened_books')
+          .doc(bookId);
 
       final doc = await listenedDocRef.get();
       if (!doc.exists) {
@@ -690,4 +727,5 @@ class AudioProvider extends ChangeNotifier {
 
     return 0;
   }
+
 }

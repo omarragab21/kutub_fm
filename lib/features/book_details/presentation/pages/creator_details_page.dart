@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-
-import '../../../../core/routes/app_routes.dart';
-import '../../../../core/theme/app_theme.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:kutub_fm/features/book_reader/presentation/pages/book_reader_screen.dart';
 
 class CreatorDetailsArgs {
   const CreatorDetailsArgs({
@@ -26,414 +25,509 @@ class CreatorDetailsPage extends StatefulWidget {
 }
 
 class _CreatorDetailsPageState extends State<CreatorDetailsPage> {
-  late Future<_CreatorProfileData> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _loadCreator();
-  }
-
-  Future<_CreatorProfileData> _loadCreator() async {
-    final profile = await _fetchProfile();
-    final books = await _fetchBooks(profile);
-    return _CreatorProfileData(profile: profile, books: books);
-  }
-
-  Future<_CreatorProfile> _fetchProfile() async {
-    final id = widget.args.creatorId.trim();
-    final fallbackName = widget.args.displayName.trim();
-    final collections = [
-      'publishers',
-      'contributors',
-      'authors',
-      'readers',
-      'narrators',
-      'creators',
-      'people',
-    ];
-
-    if (id.isNotEmpty) {
-      for (final collection in collections) {
-        final doc = await FirebaseFirestore.instance
-            .collection(collection)
-            .doc(id)
-            .get();
-        if (doc.exists) {
-          return _CreatorProfile.fromMap(
-            id: doc.id,
-            data: doc.data() ?? const {},
-            fallbackName: fallbackName,
-            roleLabel: widget.args.roleLabel,
-          );
-        }
-      }
-    }
-
-    return _CreatorProfile(
-      id: id,
-      name: fallbackName.isEmpty ? 'غير معروف' : fallbackName,
-      roleLabel: widget.args.roleLabel,
-      imageUrl: '',
-      bio: '',
-      life: '',
-    );
-  }
-
-  Future<List<_CreatorBook>> _fetchBooks(_CreatorProfile profile) async {
-    final id = widget.args.creatorId.trim();
-    final name = profile.name.trim();
-    final snapshot = await FirebaseFirestore.instance.collection('books').get();
-    final books = <_CreatorBook>[];
-
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      if (!_matchesBook(data, id: id, name: name)) continue;
-      books.add(_CreatorBook.fromMap(doc.id, data));
-    }
-
-    books.sort((a, b) => a.title.compareTo(b.title));
-    return books;
-  }
-
-  bool _matchesBook(
-    Map<String, dynamic> data, {
-    required String id,
-    required String name,
-  }) {
-    if (id.isNotEmpty) {
-      final publisherIds = [
-        data['publisherId'],
-        data['publisher_id'],
-        _readNested(data, 'publisher.id'),
-      ].map((value) => value?.toString()).whereType<String>();
-      if (publisherIds.any((value) => value == id)) return true;
-    }
-
-    final contributors = data['contributors'] as List<dynamic>? ?? const [];
-    for (final contributor in contributors) {
-      if (contributor is! Map) continue;
-      final contributorId = _readAny(contributor, [
-        'id',
-        'uid',
-        'contributorId',
-        'contributor_id',
-        'publisherId',
-        'publisher_id',
-        'personId',
-        'person_id',
-      ]);
-      if (id.isNotEmpty && contributorId == id) return true;
-
-      final contributorName = _readAny(contributor, [
-        'nameSnapshot',
-        'name',
-        'displayName',
-      ]);
-      if (id.isEmpty && name.isNotEmpty && contributorName == name) {
-        return true;
-      }
-    }
-
-    if (id.isEmpty && name.isNotEmpty) {
-      final publisherName =
-          data['publisherNameSnapshot']?.toString() ??
-          data['publisher']?.toString() ??
-          '';
-      return publisherName == name;
-    }
-
-    return false;
-  }
-
-  Object? _readNested(Map<String, dynamic> data, String path) {
-    Object? current = data;
-    for (final part in path.split('.')) {
-      if (current is! Map) return null;
-      current = current[part];
-    }
-    return current;
-  }
-
-  String _readAny(Map<dynamic, dynamic> data, List<String> keys) {
-    for (final key in keys) {
-      final value = data[key]?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-    return '';
-  }
+  bool _showAuthors = false; // Used for Publisher toggle
 
   @override
   Widget build(BuildContext context) {
+    // Determine if publisher based on roleLabel (or just hardcode based on the dummy text)
+    final isPublisher =
+        widget.args.displayName == 'فريق بوفو' ||
+        widget.args.roleLabel.contains('ناشر');
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          backgroundColor: AppTheme.background,
-          foregroundColor: AppTheme.primary,
-          elevation: 0,
-          title: Text(widget.args.roleLabel),
-        ),
-        body: FutureBuilder<_CreatorProfileData>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'تعذر تحميل البيانات',
-                  style: const TextStyle(color: AppTheme.onSurfaceVariant),
-                ),
-              );
-            }
-
-            final data = snapshot.data!;
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _profileHeader(data.profile)),
-                SliverToBoxAdapter(child: _bioSection(data.profile)),
-                SliverToBoxAdapter(child: _booksTitle(data.books.length)),
-                if (data.books.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'لا توجد كتب مرتبطة بهذا الحساب بعد.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.onSurfaceVariant),
+        backgroundColor: const Color(0xFF0C0C0C),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // Blurred Header
+            SliverToBoxAdapter(
+              child: Stack(
+                children: [
+                  // Blurred Background
+                  ClipRect(
+                    child: Container(
+                      height: 312,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: AssetImage(
+                            isPublisher
+                                ? 'assets/publisher_bofo.png'
+                                : 'assets/avatar_fawzy.png',
+                          ),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                isPublisher
+                                    ? const Color(0x4DFFBD10)
+                                    : const Color(0x4D4361EE),
+                                const Color(0xFF0C0C0C).withValues(alpha: 0.8),
+                                const Color(0xFF0C0C0C),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  )
-                else
-                  SliverList.builder(
-                    itemCount: data.books.length,
-                    itemBuilder: (context, index) =>
-                        _bookTile(data.books[index]),
                   ),
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
 
-  Widget _profileHeader(_CreatorProfile profile) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 52,
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.18),
-            backgroundImage: profile.imageUrl.isNotEmpty
-                ? NetworkImage(profile.imageUrl)
-                : null,
-            child: profile.imageUrl.isEmpty
-                ? const Icon(
-                    Icons.person_rounded,
-                    color: AppTheme.primary,
-                    size: 46,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            profile.name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppTheme.primary,
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
+                  // Content
+                  SafeArea(
+                    child: Column(
+                      children: [
+                        // Top Bar
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: SvgPicture.asset(
+                                    'assets/arrow_back.svg',
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white,
+                                      BlendMode.srcIn,
+                                    ),
+                                    width: 18,
+                                    height: 18,
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.05),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: SvgPicture.asset(
+                                      'assets/share.svg',
+                                      colorFilter: const ColorFilter.mode(
+                                        Colors.white,
+                                        BlendMode.srcIn,
+                                      ),
+                                      width: 20,
+                                      height: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.05),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: SvgPicture.asset(
+                                      'assets/heart.svg',
+                                      colorFilter: const ColorFilter.mode(
+                                        Colors.white,
+                                        BlendMode.srcIn,
+                                      ),
+                                      width: 20,
+                                      height: 20,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Avatar
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(13),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 15,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: Image.asset(
+                              isPublisher
+                                  ? 'assets/publisher_bofo.png'
+                                  : 'assets/avatar_fawzy.png',
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Name
+                        Text(
+                          widget.args.displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Description
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Text(
+                            isPublisher
+                                ? 'المنتج الأكبر للكتب الصوتية باللغة العربية في العالم\nصوت..صورة..محتوى..تسويق.\nكل ما تحتاجه علامتك التجارية في مكان واحد.\nنساعد الشركات، ودور النشر، وصنّاع المحتوى على تحويل أفكارهم إلى محتوى احترافي يُسمع، ويُشاهد، ويُسوّق بفاعلية.\nمن إنتاج الكتب الصوتية والبودكاست، إلى تصوير الفيديوهات، وإدارة محتوى السوشيال ميديا، وبناء الحملات التسويقية الرقمية.'
+                                : 'نورهان فوزي هي مؤلفة ومبدعة متخصصة في إنتاج المحتوى الصوتي والمرئي باللغة العربية. تتميز بخبرتها في تحويل الأفكار إلى محتوى احترافي يجمع بين الصوت والصورة والتسويق، وتعمل على دعم الشركات ودور النشر وصنّاع المحتوى لتحقيق تواصل فعال مع جمهورهم من خلال الكتب الصوتية، البودكاست، الفيديوهات، وإدارة الحملات التسويقية الرقمية.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            profile.roleLabel,
-            style: const TextStyle(color: AppTheme.onSurfaceVariant),
-          ),
-          if (profile.life.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              profile.life,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.onSurfaceVariant),
+
+            // Toggle Buttons or Books Label
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: isPublisher
+                    ? _buildPublisherToggle()
+                    : _buildAuthorBooksLabel(),
+              ),
+            ),
+
+            // Content Grid or List
+            SliverPadding(
+              padding: const EdgeInsets.all(16.0),
+              sliver: isPublisher && _showAuthors
+                  ? _buildAuthorsList()
+                  : _buildBooksGrid(),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _bioSection(_CreatorProfile profile) {
-    if (profile.bio.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+  Widget _buildPublisherToggle() {
+    return Align(
+      alignment: Alignment.centerRight,
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(20),
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(24),
         ),
-        child: Text(
-          profile.bio,
-          style: TextStyle(
-            color: AppTheme.onSurface.withValues(alpha: 0.85),
-            fontSize: 17,
-            height: 1.75,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _booksTitle(int count) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-      child: Row(
-        children: [
-          Text(
-            'الكتب',
-            style: const TextStyle(
-              color: AppTheme.primary,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            '$count كتاب',
-            style: const TextStyle(color: AppTheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bookTile(_CreatorBook book) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: book.imageUrl.isEmpty
-            ? Container(
-                width: 54,
-                height: 72,
-                color: AppTheme.surface,
-                child: const Icon(Icons.book_rounded, color: AppTheme.primary),
-              )
-            : Image.network(
-                book.imageUrl,
-                width: 54,
-                height: 72,
-                fit: BoxFit.cover,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _showAuthors = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: _showAuthors
+                      ? const Color(0xFFFFBD10)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text(
+                  'المؤلفون',
+                  style: TextStyle(
+                    color: _showAuthors ? const Color(0xFF1F1F1F) : const Color(0xFFBDBDBD),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-      ),
-      title: Text(
-        book.title,
-        style: const TextStyle(
-          color: AppTheme.onSurface,
-          fontWeight: FontWeight.w700,
+            ),
+            GestureDetector(
+              onTap: () => setState(() => _showAuthors = false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: !_showAuthors
+                      ? const Color(0xFFFFBD10)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text(
+                  'الكتب',
+                  style: TextStyle(
+                    color: !_showAuthors ? const Color(0xFF1F1F1F) : const Color(0xFFBDBDBD),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      subtitle: Text(
-        book.category,
-        style: const TextStyle(color: AppTheme.onSurfaceVariant),
+    );
+  }
+
+  Widget _buildAuthorBooksLabel() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFBD10),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Text(
+          'الكتب',
+          style: TextStyle(color: Color(0xFF1F1F1F), fontWeight: FontWeight.bold),
+        ),
       ),
-      onTap: () {
-        Navigator.pushNamed(context, AppRoutes.bookDetails, arguments: book.id);
+    );
+  }
+
+  Widget _buildBooksGrid() {
+    final isPublisher =
+        widget.args.displayName == 'فريق بوفو' ||
+        widget.args.roleLabel.contains('ناشر');
+
+    final books = [
+      {
+        'title': 'ألف ليلة وليلة',
+        'author': isPublisher ? 'غير معروف' : widget.args.displayName,
+        'cover': 'assets/cover_thousand_nights.png',
       },
+      {
+        'title': 'مدن الملح',
+        'author': isPublisher ? 'عبد الرحمن منيف' : widget.args.displayName,
+        'cover': 'assets/cover_salt_cities.png',
+      },
+      {
+        'title': 'الخبز الحافي',
+        'author': isPublisher ? 'محمد شكري' : widget.args.displayName,
+        'cover': 'assets/cover_barefoot_bread.png',
+      },
+      {
+        'title': 'رجال في الشمس',
+        'author': isPublisher ? 'غسان كنفاني' : widget.args.displayName,
+        'cover': 'assets/cover_men_in_sun.png',
+      },
+      {
+        'title': 'ذاكرة الجسد',
+        'author': isPublisher ? 'أحلام مستغانمي' : widget.args.displayName,
+        'cover': 'assets/cover_memory_body.png',
+      },
+      {
+        'title': 'في قلبي أنثى عبرية',
+        'author': isPublisher ? 'خولة حمدي' : widget.args.displayName,
+        'cover': 'assets/cover_jewish_girl.png',
+      },
+    ];
+
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.58,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final book = books[index];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 114 / 148,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      book['cover']!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      width: 27,
+                      height: 27,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      child: ClipOval(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+                          child: Center(
+                            child: SvgPicture.asset(
+                              'assets/heart.svg',
+                              width: 14,
+                              height: 14,
+                              colorFilter: ColorFilter.mode(
+                                index == 1 ? const Color(0xFFFF4B4B) : Colors.white,
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              book['title']!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              book['author']!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        );
+      }, childCount: books.length),
     );
   }
-}
 
-class _CreatorProfileData {
-  const _CreatorProfileData({required this.profile, required this.books});
+  Widget _buildAuthorsList() {
+    // Dummy authors list
+    final authors = [
+      {'name': 'احمد العربي', 'books': '12 كتاب', 'followers': '20 متابع'},
+      {'name': 'ليلى حسن', 'books': '18 كتاب', 'followers': '35 متابع'},
+      {'name': 'سامر العلي', 'books': '22 كتاب', 'followers': '50 متابع'},
+      {'name': 'نورهان فوزي', 'books': '9 كتب', 'followers': '15 متابع'},
+      {'name': 'سارة محمد', 'books': '16 كتاب', 'followers': '40 متابع'},
+    ];
 
-  final _CreatorProfile profile;
-  final List<_CreatorBook> books;
-}
+    final authorImages = [
+      'assets/avatar_arabic.png',
+      'assets/avatar_hassan.png',
+      'assets/avatar_ali.png',
+      'assets/avatar_fawzy.png',
+      'assets/avatar_sarah.png',
+    ];
 
-class _CreatorProfile {
-  const _CreatorProfile({
-    required this.id,
-    required this.name,
-    required this.roleLabel,
-    required this.imageUrl,
-    required this.bio,
-    required this.life,
-  });
-
-  final String id;
-  final String name;
-  final String roleLabel;
-  final String imageUrl;
-  final String bio;
-  final String life;
-
-  factory _CreatorProfile.fromMap({
-    required String id,
-    required Map<String, dynamic> data,
-    required String fallbackName,
-    required String roleLabel,
-  }) {
-    String read(List<String> keys) {
-      for (final key in keys) {
-        final value = data[key]?.toString().trim() ?? '';
-        if (value.isNotEmpty) return value;
-      }
-      return '';
-    }
-
-    return _CreatorProfile(
-      id: id,
-      name: read(['name', 'displayName', 'fullName', 'title']).isNotEmpty
-          ? read(['name', 'displayName', 'fullName', 'title'])
-          : fallbackName,
-      roleLabel: roleLabel,
-      imageUrl: read(['imageUrl', 'photoUrl', 'avatarUrl', 'logoUrl']),
-      bio: read(['bio', 'biography', 'description', 'about', 'lifeStory']),
-      life: read(['life', 'lifeSpan', 'birthDeath', 'dates']),
-    );
-  }
-}
-
-class _CreatorBook {
-  const _CreatorBook({
-    required this.id,
-    required this.title,
-    required this.imageUrl,
-    required this.category,
-  });
-
-  final String id;
-  final String title;
-  final String imageUrl;
-  final String category;
-
-  factory _CreatorBook.fromMap(String id, Map<String, dynamic> data) {
-    final categories = data['categorySnapshots'] as List<dynamic>? ?? const [];
-    final category = categories
-        .map((item) => item is Map ? item['name']?.toString() ?? '' : '')
-        .where((name) => name.isNotEmpty)
-        .join('، ');
-
-    return _CreatorBook(
-      id: id,
-      title: data['title']?.toString() ?? '',
-      imageUrl: data['imageUrl']?.toString() ?? '',
-      category: category.isNotEmpty ? category : 'كتاب صوتي',
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final author = authors[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF333333)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: AssetImage(authorImages[index % authorImages.length]),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  author['name']!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFBD10),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Text(
+                  author['books']!,
+                  style: const TextStyle(
+                    color: Color(0xFF1F1F1F),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F1F1F),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Text(
+                  author['followers']!,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        );
+      }, childCount: authors.length),
     );
   }
 }

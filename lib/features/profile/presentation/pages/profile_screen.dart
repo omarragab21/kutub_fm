@@ -1,31 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:kutub_fm/core/routes/app_routes.dart';
-import 'package:provider/provider.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import '../viewmodels/profile_viewmodel.dart';
-import '../../domain/entities/user_profile.dart';
-import '../widgets/profile_widgets.dart';
-import 'edit_profile_screen.dart';
-import 'package:kutub_fm/features/subscription/presentation/screens/subscription_screen.dart';
-import 'package:kutub_fm/features/subscription/presentation/providers/subscription_provider.dart';
-import 'package:kutub_fm/features/subscription/data/repositories_impl/payment_repository_impl.dart';
-import 'package:kutub_fm/features/subscription/data/datasources/apple_pay_data_source.dart';
-import 'package:kutub_fm/features/subscription/data/datasources/google_play_data_source.dart';
-import 'package:kutub_fm/features/subscription/data/datasources/wallet_payment_data_source.dart';
-import 'package:kutub_fm/features/subscription/data/datasources/credit_card_payment_data_source.dart';
-import 'package:kutub_fm/features/reels/presentation/pages/reels_feed_page.dart';
-
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:kutub_fm/features/profile/presentation/pages/edit_profile_screen.dart';
+import 'package:kutub_fm/features/profile/domain/entities/user_profile.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ProfileViewModel()..fetchProfile(),
-      child: const _ProfileView(),
-    );
+    return const _ProfileView();
   }
 }
 
@@ -34,208 +18,467 @@ class _ProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<ProfileViewModel>();
-    final authProvider = context.watch<AuthProvider>();
-
-    // Show error snackbar reactively
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (viewModel.status == ProfileStatus.error &&
-          viewModel.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(viewModel.errorMessage!),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    });
-
-    // Loading state
-    if (viewModel.isLoading || viewModel.profile == null) {
-      return const Scaffold(
-        backgroundColor: AppTheme.background,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-      );
-    }
-
-    final firebaseUser = authProvider.user;
-    final firebaseName = firebaseUser?.displayName?.trim();
-    final profile = viewModel.profile!.copyWith(
-      name: authProvider.isGuest
-          ? 'زائر'
-          : (firebaseName != null && firebaseName.isNotEmpty
-                ? firebaseName
-                : viewModel.profile!.name),
-      bio: authProvider.isGuest
-          ? 'تستخدم كتب FM كزائر. أنشئ حساباً لاحقاً لحفظ تقدمك ومزامنة بياناتك.'
-          : viewModel.profile!.bio,
-    );
-
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // ── Header App Bar ──────────────────────────────────────────
-          SliverAppBar(
-            pinned: false,
-            floating: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            toolbarHeight: 60,
-            title: const Text(
-              'الملف الشخصي',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.workspace_premium,
-                  color: Color(0xFFD4AF37),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChangeNotifierProvider(
-                        create: (_) => SubscriptionProvider(
-                          repository: PaymentRepositoryImpl(
-                            applePayDataSource: ApplePayDataSource(),
-                            googlePlayDataSource: GooglePlayDataSource(),
-                            walletDataSource: WalletPaymentDataSource(),
-                            creditCardDataSource: CreditCardPaymentDataSource(),
-                          ),
-                        ),
-                        child: const SubscriptionScreen(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              if (viewModel.isSaving)
-                const Padding(
-                  padding: EdgeInsets.only(right: 16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primary,
-                    ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF040707),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 16.0,
                   ),
-                )
-              else
-                IconButton(
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    color: Colors.white,
-                  ),
-                  onPressed: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.settings),
+                  children: [
+                    _buildProfileInfo(),
+                    const SizedBox(height: 24),
+                    _buildStatsRow(),
+                    const SizedBox(height: 24),
+                    _buildPremiumBanner(),
+                    const SizedBox(height: 24),
+                    _buildActivityTimeline(context),
+                    const SizedBox(height: 80), // Bottom padding
+                  ],
                 ),
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
 
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-
-                // ── Avatar & Name ────────────────────────────────────
-                Center(child: ProfileHeaderWidget(profile: profile)),
-                const SizedBox(height: 16),
-                _AuthAccountCard(
-                  email: firebaseUser?.email,
-                  isGuest: authProvider.isGuest,
-                  onLogin: () => Navigator.of(
-                    context,
-                  ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false),
-                ),
-                const SizedBox(height: 20),
-
-                // ── Edit Profile Button ──────────────────────────────
-                if (!authProvider.isGuest)
-                  Center(
-                    child: _EditButton(onTap: () => _openEditProfile(context, profile)),
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Right side: Edit Profile Button
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(
+                    profile: const UserProfile(
+                      id: '1',
+                      name: 'رامي عامر',
+                      email: 'example@gmail.com',
+                      favoriteCategories: [],
+                    ),
+                    onSave:
+                        (
+                          name,
+                          email,
+                          bio,
+                          categories,
+                          bListened,
+                          lMins,
+                          favs,
+                          followers,
+                          following,
+                          weekly,
+                          continueList,
+                          img,
+                        ) async {},
                   ),
-                const SizedBox(height: 28),
-
-                // ── Stats ────────────────────────────────────────────
-                StatsWidget(profile: profile),
-                const SizedBox(height: 28),
-
-                // ── Continue Listening ───────────────────────────────
-                _SectionTitle(title: 'متابعة الاستماع'),
-                const SizedBox(height: 12),
-                ContinueListeningCarousel(items: profile.continueListening),
-                const SizedBox(height: 28),
-
-                // ── Category Interests ───────────────────────────────
-                _SectionTitle(title: 'اهتماماتي'),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: profile.favoriteCategories.map((cat) {
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ReelsFeedPage(category: cat),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppTheme.primary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Text(
-                            cat,
-                            style: const TextStyle(
-                              color: AppTheme.primary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1F1F1F),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 6.7,
+                          top: 2.5,
+                          width: 10.8,
+                          height: 10.8,
+                          child: SvgPicture.asset(
+                            'assets/profile/imgVector13.svg',
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFFF4F4F4),
+                              BlendMode.srcIn,
                             ),
                           ),
                         ),
-                      );
-                    }).toList(),
+                        Positioned(
+                          left: 2.5,
+                          top: 4.2,
+                          width: 13.3,
+                          height: 13.3,
+                          child: SvgPicture.asset(
+                            'assets/profile/imgVector14.svg',
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFFF4F4F4),
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'تعديل',
+                    style: TextStyle(
+                      fontFamily: 'ThmanyahSans',
+                      color: const Color(0xFFF4F4F4),
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Left side: Moon & Back (chevron on far left)
+          Row(
+            children: [
+              // Moon toggle
+              Container(
+                width: 41,
+                height: 41,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F1F1F),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Center(
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector2.svg',
+                    width: 24,
+                    height: 24,
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              // Back Button (chevron_left)
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  width: 41,
+                  height: 41,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F1F1F),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector12.svg',
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                const SizedBox(height: 28),
+  Widget _buildProfileInfo() {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFFFFF675),
+          ),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/profile/imgAvatar.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'رامي عامر',
+          style: TextStyle(
+            fontFamily: 'ThmanyahSans',
+            color: const Color(0xFFF4F4F4),
+            fontSize: 24.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildFollowLabel('يتابعك 220'),
+            const SizedBox(width: 4),
+            _buildFollowLabel('تتابع 520'),
+          ],
+        ),
+      ],
+    );
+  }
 
-                // ── Weekly Heatmap ───────────────────────────────────
-                _SectionTitle(title: 'نشاطي هذا الأسبوع'),
-                const SizedBox(height: 12),
-                ListeningHeatmap(weeklyMinutes: profile.weeklyActivityMinutes),
-                const SizedBox(height: 28),
+  Widget _buildFollowLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'ThmanyahSans',
+          color: const Color(0xFFF4F4F4),
+          fontSize: 12.sp,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
 
-                // ── Achievements ─────────────────────────────────────
-                if (profile.achievements.isNotEmpty) ...[
-                  _SectionTitle(title: 'الإنجازات 🏆'),
-                  const SizedBox(height: 12),
-                  _AchievementsRow(achievements: profile.achievements),
-                  const SizedBox(height: 28),
-                ],
-                const SizedBox(height: 120),
+  Widget _buildStatsRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildStatWidget(
+          value: '1.5',
+          label: 'ساعات استماع',
+          icon: SizedBox(
+            width: 24,
+            height: 24,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 3.0,
+                  top: 3.0,
+                  width: 18.0,
+                  height: 14.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector3.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 4.0,
+                  top: 14.0,
+                  width: 5.0,
+                  height: 7.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector4.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 15.0,
+                  top: 14.0,
+                  width: 5.0,
+                  height: 7.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector5.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _buildDivider(),
+        _buildStatWidget(
+          value: '35',
+          label: 'صفحات قراءة',
+          icon: SizedBox(
+            width: 24,
+            height: 24,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 12.0,
+                  top: 2.0,
+                  width: 7.0,
+                  height: 20.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector9.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 2.0,
+                  top: 5.0,
+                  width: 10.0,
+                  height: 17.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector10.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 12.0,
+                  top: 5.0,
+                  width: 10.0,
+                  height: 17.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector11.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _buildDivider(),
+        _buildStatWidget(
+          value: '3',
+          label: 'أيام حماسة',
+          icon: SizedBox(
+            width: 24,
+            height: 24,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 4.0,
+                  top: 2.5,
+                  width: 16.0,
+                  height: 19.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector6.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 8.0,
+                  top: 9.5,
+                  width: 8.0,
+                  height: 9.0,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgVector7.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(width: 1, height: 48, color: const Color(0xFF333333));
+  }
+
+  Widget _buildStatWidget({
+    required String value,
+    required String label,
+    required Widget icon,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'ThmanyahSans',
+                color: const Color(0xFFF4F4F4),
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'ThmanyahSans',
+            color: const Color(0xFFBDBDBD),
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPremiumBanner() {
+    return Container(
+      height: 70,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF040707),
+        border: Border.all(color: const Color(0xFF333333)),
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF040707), Color(0xFFFFBD10)],
+          stops: [0.36, 2.04],
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Right side: Button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFBD10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'اشترك في كتب Premium',
+              style: TextStyle(
+                fontFamily: 'ThmanyahSans',
+                color: const Color(0xFF1F1F1F),
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          // Left side: Logo Stack (smaller than container height of 70)
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: 60,
+                  height: 60,
+                  child: SvgPicture.asset(
+                    'assets/profile/imgBadge.svg',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                Positioned(
+                  left: 15.5,
+                  top: 15.5,
+                  width: 29,
+                  height: 29,
+                  child: Image.asset(
+                    'assets/profile/imgKotob141.png',
+                    fit: BoxFit.fill,
+                  ),
+                ),
               ],
             ),
           ),
@@ -244,102 +487,458 @@ class _ProfileView extends StatelessWidget {
     );
   }
 
-  void _openEditProfile(BuildContext context, UserProfile profile) {
-    final viewModel = context.read<ProfileViewModel>();
-
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 350),
-        pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(0, 0.06),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-            child: EditProfileScreen(
-              profile: profile,
-              onSave: (
-                name,
-                email,
-                bio,
-                categories,
-                totalBooksListened,
-                totalListeningMinutes,
-                favoritesCount,
-                followersCount,
-                followingCount,
-                weeklyActivityMinutes,
-                continueListening,
-                newProfileImage,
-              ) async {
-                await Future.wait([
-                  viewModel.updateProfile(
-                    name: name,
-                    email: email,
-                    bio: bio,
-                    favoriteCategories: categories,
-                    totalBooksListened: totalBooksListened,
-                    totalListeningMinutes: totalListeningMinutes,
-                    favoritesCount: favoritesCount,
-                    followersCount: followersCount,
-                    followingCount: followingCount,
-                    weeklyActivityMinutes: weeklyActivityMinutes,
-                    continueListening: continueListening,
-                    profileImage: newProfileImage,
-                  ),
-                  context.read<AuthProvider>().updateProfileName(name),
-                ]);
-                if (!context.mounted) return;
-                final error = context.read<AuthProvider>().errorMessage;
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(error),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
+  Widget _buildActivityTimeline(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTimelineSectionHeader('قبل ساعة'),
+        const SizedBox(height: 8),
+        _buildReviewCard(),
+        const SizedBox(height: 8),
+        _buildPodcastCard(
+          title: 'كيف يشكل الكتاب عقلك',
+          subtitle: '12 نوفمبر • الحلقة 2',
+          duration: '30:00 د',
+          coverImage: 'assets/profile/imgFrame115.png',
         ),
+        const SizedBox(height: 24),
+        _buildTimelineSectionHeader('قبل يومين'),
+        const SizedBox(height: 8),
+        _buildContinueReadingCard(),
+        const SizedBox(height: 8),
+        _buildReviewCard2(),
+        const SizedBox(height: 8),
+        _buildPodcastCard(
+          title: 'العادات السبع للأسر الأكثر فعالية',
+          subtitle: '6 يونيو • الحلقة 4',
+          duration: '01:20 س',
+          coverImage: 'assets/profile/imgFrame116.png',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineSectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontFamily: 'ThmanyahSans',
+        color: const Color(0xFFBDBDBD),
+        fontSize: 16.sp,
+        fontWeight: FontWeight.w400,
       ),
     );
   }
-}
 
-// ─── Helper Widgets ───────────────────────────────────────────────────────────
-
-class _AuthAccountCard extends StatelessWidget {
-  const _AuthAccountCard({
-    required this.email,
-    required this.isGuest,
-    required this.onLogin,
-  });
-
-  final String? email;
-  final bool isGuest;
-  final VoidCallback onLogin;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildReviewCard() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipOval(
+                child: Image.asset(
+                  'assets/profile/imgAvatar.png',
+                  width: 54,
+                  height: 54,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'رامي عامر',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFFF4F4F4),
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '24/5/2026',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFFBDBDBD),
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFBD10),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Text(
+                  'مراجعة',
+                  style: TextStyle(
+                    fontFamily: 'ThmanyahSans',
+                    color: const Color(0xFF1F1F1F),
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 1.0),
+                child: SvgPicture.asset(
+                  i < 4
+                      ? 'assets/community/imgVector.svg'
+                      : 'assets/community/imgVector1.svg',
+                  width: 18,
+                  height: 18,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'رواية استثنائية، أعادت تشكيل نظرتي للحياة والحب والوجود أسلوب ساحر ومترجم بشكل رائع. أنصح بها بشدة.',
+            style: TextStyle(
+              fontFamily: 'ThmanyahSans',
+              color: const Color(0xFFF4F4F4),
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w400,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 58,
+            padding: const EdgeInsets.only(
+              right: 16,
+              left: 8,
+              top: 8,
+              bottom: 8,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFF808080)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.asset(
+                    'assets/profile/imgImage26.png',
+                    width: 31,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'مئة عام من العزلة',
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFFF4F4F4),
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'أحمد خالد توفيق',
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFFBDBDBD),
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SvgPicture.asset(
+                  'assets/nav_books.svg',
+                  width: 24,
+                  height: 24,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              SvgPicture.asset(
+                'assets/community/imgVector11.svg',
+                width: 20,
+                height: 20,
+                colorFilter: const ColorFilter.mode(
+                  Color(0xFFBDBDBD),
+                  BlendMode.srcIn,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.share_outlined,
+                color: const Color(0xFFBDBDBD),
+                size: 20,
+              ),
+              const SizedBox(width: 16),
+              _buildActionIcon('assets/community/imgVector6.svg', '20'),
+              const SizedBox(width: 16),
+              _buildActionIcon('assets/community/imgVector5.svg', '35'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewCard2() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipOval(
+                child: Image.asset(
+                  'assets/profile/imgAvatar.png',
+                  width: 54,
+                  height: 54,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'رامي عامر',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFFF4F4F4),
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '7/9/2026',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFFBDBDBD),
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFBD10),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Text(
+                  'مراجعة',
+                  style: TextStyle(
+                    fontFamily: 'ThmanyahSans',
+                    color: const Color(0xFF1F1F1F),
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 1.0),
+                child: SvgPicture.asset(
+                  i < 4
+                      ? 'assets/community/imgVector.svg'
+                      : 'assets/community/imgVector1.svg',
+                  width: 18,
+                  height: 18,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'عمل أدبي رائع يتناول قضايا الهوية والذاكرة بطريقة فلسفية وعميقة.',
+            style: TextStyle(
+              fontFamily: 'ThmanyahSans',
+              color: const Color(0xFFF4F4F4),
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w400,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 58,
+            padding: const EdgeInsets.only(
+              right: 16,
+              left: 8,
+              top: 8,
+              bottom: 8,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFF808080)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.asset(
+                    'assets/profile/imgImage27.png',
+                    width: 31,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'موسم الهجرة إلى الشمال',
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFFF4F4F4),
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'الطيب صالح',
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFFBDBDBD),
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SvgPicture.asset(
+                  'assets/nav_books.svg',
+                  width: 24,
+                  height: 24,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              SvgPicture.asset(
+                'assets/community/imgVector11.svg',
+                width: 20,
+                height: 20,
+                colorFilter: const ColorFilter.mode(
+                  Color(0xFFBDBDBD),
+                  BlendMode.srcIn,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.share_outlined,
+                color: const Color(0xFFBDBDBD),
+                size: 20,
+              ),
+              const SizedBox(width: 16),
+              _buildActionIcon('assets/community/imgVector6.svg', '17'),
+              const SizedBox(width: 16),
+              _buildActionIcon('assets/community/imgVector5.svg', '30'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPodcastCard({
+    required String title,
+    required String subtitle,
+    required String duration,
+    required String coverImage,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
       ),
       child: Row(
         children: [
-          Icon(
-            isGuest ? Icons.person_outline_rounded : Icons.verified_user,
-            color: AppTheme.primary,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              coverImage,
+              width: 77,
+              height: 90,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -347,156 +946,258 @@ class _AuthAccountCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isGuest ? 'حساب زائر' : 'حساب مفعل',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'ThmanyahSans',
+                    color: const Color(0xFFBDBDBD),
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  isGuest
-                      ? 'سجل الدخول أو أنشئ حساباً لحفظ بياناتك'
-                      : email ?? 'بريد غير متاح',
+                  title,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 12,
+                    fontFamily: 'ThmanyahSans',
+                    color: const Color(0xFFF4F4F4),
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFBD10),
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/profile/imgVector26.svg',
+                        width: 14,
+                        height: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        duration,
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFF1F1F1F),
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          if (isGuest)
-            TextButton(onPressed: onLogin, child: const Text('تسجيل')),
+          const SizedBox(width: 12),
+          SvgPicture.asset(
+            'assets/profile/imgVector25.svg',
+            width: 18,
+            height: 18,
+          ),
         ],
       ),
     );
   }
-}
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  const _SectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 17,
-          fontWeight: FontWeight.bold,
-        ),
+  Widget _buildContinueReadingCard() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
       ),
-    );
-  }
-}
-
-class _EditButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _EditButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.primary, AppTheme.primaryContainer],
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/profile/imgRectangle1.png',
+              width: 113,
+              height: 129,
+              fit: BoxFit.cover,
+            ),
           ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'كيف تركت العزلة',
+                          style: TextStyle(
+                            fontFamily: 'ThmanyahSans',
+                            color: const Color(0xFFF4F4F4),
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'رجب البابورجي',
+                          style: TextStyle(
+                            fontFamily: 'ThmanyahSans',
+                            color: const Color(0xFFBDBDBD),
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SvgPicture.asset(
+                      'assets/profile/imgVector27.svg',
+                      width: 18,
+                      height: 18,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '10%',
+                      style: TextStyle(
+                        fontFamily: 'ThmanyahSans',
+                        color: const Color(0xFFBDBDBD),
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: const LinearProgressIndicator(
+                        value: 0.1,
+                        backgroundColor: Color(0xFF393939),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFFC5C5C5),
+                        ),
+                        minHeight: 3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFBD10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'إكمال القراءة',
+                        style: TextStyle(
+                          fontFamily: 'ThmanyahSans',
+                          color: const Color(0xFF1F1F1F),
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: 10.0,
+                              top: 1.7,
+                              width: 5.8,
+                              height: 16.6,
+                              child: SvgPicture.asset(
+                                'assets/profile/imgVector28.svg',
+                                fit: BoxFit.fill,
+                                colorFilter: const ColorFilter.mode(
+                                  Color(0xFF1F1F1F),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 1.7,
+                              top: 4.2,
+                              width: 8.3,
+                              height: 14.1,
+                              child: SvgPicture.asset(
+                                'assets/profile/imgVector29.svg',
+                                fit: BoxFit.fill,
+                                colorFilter: const ColorFilter.mode(
+                                  Color(0xFF1F1F1F),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 10.0,
+                              top: 4.2,
+                              width: 8.3,
+                              height: 14.1,
+                              child: SvgPicture.asset(
+                                'assets/profile/imgVector30.svg',
+                                fit: BoxFit.fill,
+                                colorFilter: const ColorFilter.mode(
+                                  Color(0xFF1F1F1F),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.edit_outlined, color: Colors.black, size: 16),
-            SizedBox(width: 8),
-            Text(
-              'تعديل الملف الشخصي',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _AchievementsRow extends StatelessWidget {
-  final List<UserAchievement> achievements;
-  const _AchievementsRow({required this.achievements});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: achievements.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, i) {
-          final b = achievements[i];
-          return AnimatedOpacity(
-            opacity: b.unlocked ? 1.0 : 0.35,
-            duration: const Duration(milliseconds: 400),
-            child: Container(
-              width: 90,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: b.unlocked
-                      ? AppTheme.primary.withValues(alpha: 0.3)
-                      : Colors.white.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(b.icon, style: const TextStyle(fontSize: 28)),
-                  const SizedBox(height: 6),
-                  Text(
-                    b.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    b.desc,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      fontSize: 9,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+  Widget _buildActionIcon(String iconPath, String count) {
+    return Row(
+      children: [
+        SvgPicture.asset(
+          iconPath,
+          width: 20,
+          height: 20,
+          colorFilter: const ColorFilter.mode(
+            Color(0xFFBDBDBD),
+            BlendMode.srcIn,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          count,
+          style: TextStyle(
+            fontFamily: 'ThmanyahSans',
+            color: const Color(0xFFBDBDBD),
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

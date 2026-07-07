@@ -2,9 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/storage/firebase_storage_url_resolver.dart';
 import '../providers/auth_provider.dart';
-import '../../../home/presentation/viewmodels/home_view_model.dart';
 
 class CategoryItem {
   final String id;
@@ -36,11 +37,18 @@ class CategoryItem {
       'arabicName',
     ], fallback: document.id);
 
+    final imageUrl = _nullableStringField(data, const [
+      'imageUrl',
+      'image',
+      'icon',
+      'iconUrl',
+    ]);
+
     return CategoryItem(
       id: document.id,
       title: title,
-      iconUrl: _nullableStringField(data, const ['icon', 'iconUrl']),
-      imageUrl: _nullableStringField(data, const ['image', 'imageUrl']),
+      iconUrl: imageUrl,
+      imageUrl: imageUrl,
       bookCount: _bookCountLabel(data['bookCount']),
       fallbackIcon: _fallbackIconFor(document.id, title),
       isLarge: data['isLarge'] == true,
@@ -82,29 +90,41 @@ class CategoryItem {
 
   static IconData _fallbackIconFor(String id, String title) {
     final source = '$id $title'.toLowerCase();
-    if (source.contains('fiction') || source.contains('روا')) {
-      return Icons.auto_stories;
+    if (source.contains('horror') || source.contains('رعب')) {
+      return Icons.flash_on;
     }
-    if (source.contains('history') || source.contains('تاريخ')) {
-      return Icons.history_edu;
+    if (source.contains('classic') || source.contains('كلاسيكي')) {
+      return Icons.favorite_border;
+    }
+    if (source.contains('romance') || source.contains('رومانسية')) {
+      return Icons.favorite;
+    }
+    if (source.contains('korean') || source.contains('كوري')) {
+      return Icons.translate;
     }
     if (source.contains('self') || source.contains('ذات')) {
-      return Icons.psychology_alt;
-    }
-    if (source.contains('business') || source.contains('اقتصاد')) {
-      return Icons.trending_up;
-    }
-    if (source.contains('children') || source.contains('أطفال')) {
-      return Icons.child_care;
-    }
-    if (source.contains('technology') || source.contains('تقنية')) {
-      return Icons.memory;
-    }
-    if (source.contains('science') || source.contains('علوم')) {
-      return Icons.science;
+      return Icons.psychology;
     }
     if (source.contains('religion') || source.contains('دين')) {
-      return Icons.mosque;
+      return Icons.brightness_3;
+    }
+    if (source.contains('poetry') || source.contains('شعر')) {
+      return Icons.menu_book;
+    }
+    if (source.contains('family') || source.contains('الأسرة')) {
+      return Icons.child_care;
+    }
+    if (source.contains('letter') || source.contains('رسائل')) {
+      return Icons.email;
+    }
+    if (source.contains('philosophy') || source.contains('فلسفة')) {
+      return Icons.insights;
+    }
+    if (source.contains('theat') || source.contains('مسرح')) {
+      return Icons.theater_comedy;
+    }
+    if (source.contains('novel') || source.contains('رواية')) {
+      return Icons.explore;
     }
     return Icons.category;
   }
@@ -128,9 +148,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   bool _isSaving = false;
   String? _loadError;
 
-  static const String _fallbackCommunityImageUrl =
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDN5HITfoUosvbHw1AQ8y4RRGDNXaF2TGC14-O6QbzHyKv9eThscCrhmOoY5VTrlXGGBXOhPhe5FyBmo5wqzq5LJ0Dyfu5J8u9sZKMX2j0eumz_Fn3p46RYtTQ76l9j04X87efUomtmmN7KDK65NVi8hcEJ17WgU4yp4NT2u8L7_0BoprEo2u7TKR4q1Bvc6qaoBVzgCxvwiUigLpJffrJpvLYu0jCvvol_PWge9ODU_pakMcETXgUifR8eENWhhsKYBOyel6wB_lU';
-
   @override
   void initState() {
     super.initState();
@@ -145,13 +162,33 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
 
     try {
       final snapshot = await _firestore
-          .collection('categories')
+          .collection('interested')
           .orderBy('createdAt')
           .get();
 
-      final categories = snapshot.docs
+      final tempCategories = snapshot.docs
           .map(CategoryItem.fromFirestore)
-          .toList(growable: false);
+          .toList();
+
+      final categories = await Future.wait(
+        tempCategories.map((item) async {
+          String? resolvedIconUrl;
+          if (item.iconUrl != null) {
+            resolvedIconUrl = await FirebaseStorageUrlResolver.resolve(
+              item.iconUrl!,
+            );
+          }
+          return CategoryItem(
+            id: item.id,
+            title: item.title,
+            iconUrl: resolvedIconUrl,
+            imageUrl: resolvedIconUrl,
+            bookCount: item.bookCount,
+            fallbackIcon: item.fallbackIcon,
+            isLarge: item.isLarge,
+          );
+        }),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -167,7 +204,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _loadError = 'تعذر تحميل التصنيفات الآن';
+        _loadError = 'تعذر تحميل الاهتمامات الآن';
         _isLoadingCategories = false;
       });
     }
@@ -193,9 +230,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       if (!mounted) return;
       await context.read<AuthProvider>().refreshUser();
       if (!mounted) return;
-      await context.read<HomeViewModel>().fetchHomeData();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
     } on FirebaseException catch (error) {
       if (!mounted) return;
       setState(() => _isSaving = false);
@@ -217,12 +252,10 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       if (!mounted) return;
       await context.read<AuthProvider>().refreshUser();
       if (!mounted) return;
-      await context.read<HomeViewModel>().fetchHomeData();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
     } catch (_) {
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
     }
   }
 
@@ -265,7 +298,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   String _mapFirebaseError(FirebaseException error) {
     switch (error.code) {
       case 'permission-denied':
-        return 'ليس لديك صلاحية للوصول إلى التصنيفات';
+        return 'ليس لديك صلاحية للوصول إلى الاهتمامات';
       case 'unavailable':
       case 'network-request-failed':
         return 'تحقق من اتصال الإنترنت وحاول مرة أخرى';
@@ -274,329 +307,196 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     }
   }
 
-  String get _communityImageUrl {
-    for (final category in _categories) {
-      if (_selectedCategoryIds.contains(category.id) &&
-          category.imageUrl != null) {
-        return category.imageUrl!;
-      }
-    }
-
-    for (final category in _categories) {
-      if (category.imageUrl != null) return category.imageUrl!;
-    }
-
-    return _fallbackCommunityImageUrl;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Stack(
-        children: [
-          // Background Pattern
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.1,
-              child: CustomPaint(
-                painter: GridPainter(color: theme.colorScheme.primary),
-              ),
-            ),
-          ),
-
-          // Content
-          CustomScrollView(
-            slivers: [
-              // Sticky App Bar
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: theme.colorScheme.surface.withValues(
-                  alpha: 0.6,
-                ),
-                automaticallyImplyLeading: false,
-                title: Row(
-                  children: [
-                    Icon(
-                      Icons.menu_book,
-                      color: theme.colorScheme.primary,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'كتب FM',
-                      style: theme.textTheme.displayLarge?.copyWith(
-                        fontSize: 24,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 160),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // Header Section
-                    Center(
-                      child: Column(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Top Progress and Skip
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: theme.colorScheme.outlineVariant
-                                    .withValues(alpha: 0.1),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: theme.colorScheme.primary,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: theme.colorScheme.primary,
-                                        blurRadius: 8,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'اختر اهتماماتك',
-                            style: theme.textTheme.displayLarge?.copyWith(
-                              fontSize: 36,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'ساعدنا نخصص تجربتك حسب ذوقك لنقدم لك أفضل ما في عالم المعرفة',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-
-                    _buildCategoriesSection(theme),
-
-                    const SizedBox(height: 48),
-
-                    // Decorative Element
-                    Container(
-                      height: 192,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 32,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
-                          children: [
-                            Image.network(
-                              _communityImageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              opacity: const AlwaysStoppedAnimation(0.6),
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.auto_stories,
-                                    color: theme.colorScheme.primary,
-                                    size: 48,
-                                  ),
-                                );
-                              },
-                            ),
-                            Container(
+                          Expanded(
+                            child: Container(
+                              height: 3,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    theme.colorScheme.surface,
-                                  ],
-                                ),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(1.5),
                               ),
-                            ),
-                            Positioned(
-                              bottom: 16,
-                              right: 16,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'انضم إلى مجتمعنا',
-                                    style: theme.textTheme.displayLarge
-                                        ?.copyWith(
-                                          fontSize: 20,
-                                          fontStyle: FontStyle.italic,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                  ),
-                                  Text(
-                                    'أكثر من مليون قارئ ومستمع',
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontSize: 10,
-                                      letterSpacing: 1.5,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ]),
-                ),
-              ),
-            ],
-          ),
-
-          // Fixed Bottom Actions
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.colorScheme.surface.withValues(alpha: 0),
-                    theme.colorScheme.surface,
-                  ],
-                  stops: const [0.0, 0.3],
-                ),
-              ),
-              child: SafeArea(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed:
-                            (_isSaving ||
-                                _isLoadingCategories ||
-                                _loadError != null ||
-                                _categories.isEmpty)
-                            ? null
-                            : _continueToHome,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          elevation: 8,
-                          shadowColor: theme.colorScheme.primary.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        child: _isSaving
-                            ? SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.onPrimary,
-                                ),
-                              )
-                            : const Text(
-                                'متابعة',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: _isSaving ? null : _skipToHome,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'تخطي الآن',
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.6),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Icon(
-                            Icons.arrow_back,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.6),
+                          Expanded(
+                            child: Container(
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(1.5),
+                              ),
+                            ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '1/2',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _skipToHome,
+                            child: const Text(
+                              'تخطي',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 2. Middle Content Area (Scrollable)
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 70),
+                        const Text(
+                          'اختر اهتماماتك',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'أخبرنا بما يلفت انتباهك، ودعنا نأخذك إلى كتب وحكايات وأصوات صنعت لتلامس شغفك.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 16,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 36),
+                        _buildInterestsSection(theme),
+                        const SizedBox(height: 36),
+                      ],
                     ),
+                  ),
+                ),
+
+                // 3. Fixed Bottom Actions
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        onPressed:
+                            (_isSaving ||
+                                _isLoadingCategories ||
+                                _categories.isEmpty)
+                            ? null
+                            : _continueToHome,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFC00E),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : const Text(
+                                'التالي',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () => Navigator.pop(context),
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.chevron_left,
+                                color: Colors.white.withOpacity(0.6),
+                                size: 18,
+                              ),
+                              Text(
+                                'عودة للخلف',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCategoriesSection(ThemeData theme) {
+  Widget _buildInterestsSection(ThemeData theme) {
     if (_isLoadingCategories) {
-      return SizedBox(
-        height: 240,
+      return const SizedBox(
+        height: 200,
         child: Center(
-          child: CircularProgressIndicator(color: theme.colorScheme.primary),
+          child: CircularProgressIndicator(color: Color(0xFFFFC00E)),
         ),
       );
     }
@@ -606,28 +506,25 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF353534).withValues(alpha: 0.4),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
-          ),
         ),
         child: Column(
           children: [
-            Icon(
-              Icons.cloud_off,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 36,
-            ),
+            const Icon(Icons.cloud_off, color: Colors.white70, size: 36),
             const SizedBox(height: 12),
             Text(
               _loadError!,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+              style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: _loadCategories,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white30),
+              ),
               child: const Text('إعادة المحاولة'),
             ),
           ],
@@ -640,286 +537,81 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF353534).withValues(alpha: 0.4),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
-          ),
         ),
-        child: Text(
-          'لا توجد تصنيفات متاحة الآن',
+        child: const Text(
+          'لا توجد اهتمامات متاحة الآن',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium,
+          style: TextStyle(color: Colors.white70),
         ),
       );
     }
 
-    return _buildBentoGrid(theme);
-  }
-
-  Widget _buildBentoGrid(ThemeData theme) {
-    final rows = <Widget>[];
-    var index = 0;
-
-    while (index < _categories.length) {
-      final category = _categories[index];
-      final useLargeCard = category.isLarge || index == 4;
-
-      if (useLargeCard) {
-        rows.add(_buildLargeCategoryCard(theme, category));
-        index++;
-      } else {
-        final nextIndex = index + 1;
-        final hasSmallPair =
-            nextIndex < _categories.length &&
-            !_categories[nextIndex].isLarge &&
-            nextIndex != 4;
-
-        rows.add(
-          Row(
-            children: [
-              Expanded(child: _buildCategoryCard(theme, category)),
-              if (hasSmallPair) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildCategoryCard(theme, _categories[nextIndex]),
-                ),
-              ] else ...[
-                const SizedBox(width: 12),
-                const Expanded(child: SizedBox()),
-              ],
-            ],
-          ),
-        );
-        index += hasSmallPair ? 2 : 1;
-      }
-
-      if (index < _categories.length) {
-        rows.add(const SizedBox(height: 12));
-      }
-    }
-
-    return Column(children: rows);
-  }
-
-  Widget _buildCategoryCard(ThemeData theme, CategoryItem category) {
-    final isSelected = _selectedCategoryIds.contains(category.id);
-
-    return GestureDetector(
-      onTap: () => _toggleCategory(category.id),
-      child: Container(
-        height: 140,
-        decoration: BoxDecoration(
-          color: const Color(0xFF353534).withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    blurRadius: 32,
-                  ),
-                ]
-              : null,
-        ),
-        child: Stack(
-          children: [
-            if (isSelected)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Icon(
-                  Icons.check_circle,
-                  color: theme.colorScheme.primary,
-                  size: 20,
-                ),
-              ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                          : theme.colorScheme.surfaceContainerHighest,
-                    ),
-                    child: _buildCategoryIcon(
-                      theme,
-                      category,
-                      isSelected: isSelected,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    category.title,
-                    style: TextStyle(
-                      color: isSelected
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      fontSize: 14,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Wrap(
+      spacing: 12,
+      runSpacing: 16,
+      alignment: WrapAlignment.start,
+      children: _categories.map(_buildInterestChip).toList(),
     );
   }
 
-  Widget _buildLargeCategoryCard(ThemeData theme, CategoryItem category) {
+  Widget _buildInterestChip(CategoryItem category) {
     final isSelected = _selectedCategoryIds.contains(category.id);
+    const primaryGold = Color(0xFFFFC00E);
+    final color = isSelected ? primaryGold : Colors.white;
 
     return GestureDetector(
       onTap: () => _toggleCategory(category.id),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF353534).withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
-          ),
+          color: isSelected
+              ? primaryGold
+              : const Color(0xFF333333), // RGB 51, 51, 51
+          borderRadius: BorderRadius.circular(26), // radius 26
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                          : theme.colorScheme.surfaceContainerHighest,
-                    ),
-                    child: _buildCategoryIcon(
-                      theme,
-                      category,
-                      isSelected: isSelected,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          category.title,
-                          style: TextStyle(
-                            color: isSelected
-                                ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (category.bookCount != null)
-                          Text(
-                            category.bookCount!,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.6),
-                              fontSize: 10,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+            Text(
+              category.title,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white,
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: theme.colorScheme.primary,
-                size: 20,
-              )
-            else
-              Icon(
-                Icons.chevron_left,
-                color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.3,
-                ),
-              ),
+            const SizedBox(width: 8),
+            _buildChipIcon(category, isSelected),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoryIcon(
-    ThemeData theme,
-    CategoryItem category, {
-    required bool isSelected,
-    required double size,
-  }) {
-    final iconColor = isSelected
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-
-    if (category.iconUrl == null) {
-      return Icon(category.fallbackIcon, color: iconColor, size: size);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: Image.network(
+  Widget _buildChipIcon(CategoryItem category, bool isSelected) {
+    final iconColor = isSelected ? Colors.black : Colors.white;
+    if (category.iconUrl != null && category.iconUrl!.endsWith('.svg')) {
+      return SvgPicture.network(
         category.iconUrl!,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          return Icon(category.fallbackIcon, color: iconColor, size: size);
-        },
-      ),
-    );
-  }
-}
-
-class GridPainter extends CustomPainter {
-  final Color color;
-  GridPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.3)
-      ..strokeWidth = 1;
-
-    for (double i = 0; i < size.width; i += 32) {
-      for (double j = 0; j < size.height; j += 32) {
-        canvas.drawCircle(Offset(i, j), 1, paint);
-      }
+        width: 18,
+        height: 18,
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+        placeholderBuilder: (context) =>
+            Icon(category.fallbackIcon, color: iconColor, size: 18),
+      );
+    } else if (category.iconUrl != null) {
+      return Image.network(
+        category.iconUrl!,
+        width: 18,
+        height: 18,
+        color: iconColor,
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(category.fallbackIcon, color: iconColor, size: 18),
+      );
     }
-  }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+    return Icon(category.fallbackIcon, color: iconColor, size: 18);
+  }
 }

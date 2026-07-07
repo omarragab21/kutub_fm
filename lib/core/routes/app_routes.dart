@@ -6,8 +6,10 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/auth/presentation/screens/phone_login_screen.dart';
 import '../../features/auth/presentation/screens/otp_verification_screen.dart';
+import '../../features/auth/presentation/screens/auth_success_screen.dart';
 import '../../features/auth/presentation/facebook_login_screen.dart';
 import '../../features/auth/presentation/pages/category_selection_screen.dart';
+import '../../features/auth/presentation/screens/profile_setup_screen.dart';
 import '../../features/home/presentation/pages/main_screen.dart';
 import '../../features/book_details/presentation/pages/book_details_page.dart';
 import '../../features/book_details/presentation/pages/creator_details_page.dart';
@@ -23,6 +25,11 @@ import '../../features/podcast/presentation/pages/podcast_list_page.dart';
 import '../../features/podcast/presentation/pages/podcast_detail_page.dart';
 import '../../features/reels/presentation/pages/reel_preview_page.dart';
 import '../../features/audio_library/presentation/pages/audio_library_screen.dart';
+import '../../features/home/presentation/pages/book_world_screen.dart';
+import '../../features/home/presentation/pages/best_this_month_screen.dart';
+import '../../features/home/presentation/pages/special_collections_screen.dart';
+import '../../features/home/presentation/pages/collection_details_screen.dart';
+import '../../features/community/presentation/pages/post_details_screen.dart';
 
 import 'package:provider/provider.dart';
 import '../../features/profile/presentation/pages/settings_screen.dart';
@@ -36,7 +43,9 @@ class AppRoutes {
   static const String facebookLogin = '/facebook-login';
   static const String register = '/register';
   static const String emailVerification = '/email-verification';
+  static const String authSuccess = '/auth-success';
   static const String categorySelection = '/category_selection';
+  static const String profileSetup = '/profile-setup';
   static const String home = '/home';
   static const String bookDetails = '/book_details';
   static const String creatorDetails = '/creator_details';
@@ -55,6 +64,11 @@ class AppRoutes {
   static const String search = '/search';
   static const String reelPreview = '/reel_preview';
   static const String library = '/library';
+  static const String bookWorld = '/book_world';
+  static const String bestThisMonth = '/best_this_month';
+  static const String specialCollections = '/special_collections';
+  static const String collectionDetails = '/collection_details';
+  static const String postDetails = '/post_details';
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -88,6 +102,11 @@ class AppRoutes {
           settings: routeSettings,
           builder: (_) => const EmailVerificationScreen(),
         );
+      case authSuccess:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const AuthSuccessScreen(),
+        );
       case phoneLogin:
         return MaterialPageRoute(
           settings: routeSettings,
@@ -102,6 +121,11 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => const CategorySelectionScreen(),
+        );
+      case profileSetup:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const ProfileSetupScreen(),
         );
       case home:
         return MaterialPageRoute(
@@ -136,24 +160,9 @@ class AppRoutes {
           builder: (_) => CreatorDetailsPage(args: arg),
         );
       case bookReader:
-        final arg = routeSettings.arguments;
-        if (arg is! BookReaderScreenArgs) {
-          return MaterialPageRoute(
-            builder: (_) => const Scaffold(
-              body: Center(child: Text('بيانات الكتاب غير صالحة')),
-            ),
-          );
-        }
         return MaterialPageRoute(
           settings: routeSettings,
-          builder: (_) => BookReaderScreen(
-            pdfAssetPath: arg.pdfAssetPath,
-            bookTitle: arg.bookTitle,
-            audioUrl: arg.audioUrl,
-            chapterId: arg.chapterId,
-            transcript: arg.transcript,
-            bookCoverUrl: arg.bookCoverUrl,
-          ),
+          builder: (_) => const BookReaderScreen(),
         );
       case audioPlayer:
         return MaterialPageRoute(
@@ -264,6 +273,35 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => const AudioLibraryScreen(),
+        );
+      case bookWorld:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const BookWorldScreen(),
+        );
+      case bestThisMonth:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const BestThisMonthScreen(),
+        );
+      case specialCollections:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const SpecialCollectionsScreen(),
+        );
+      case collectionDetails:
+        final args = routeSettings.arguments as CollectionDetailsArgs?;
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => CollectionDetailsScreen(
+            args: args ?? CollectionDetailsArgs(title: 'عالم الكتب'),
+          ),
+        );
+      case postDetails:
+        final post = routeSettings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => PostDetailsScreen(post: post),
         );
       default:
         return MaterialPageRoute(

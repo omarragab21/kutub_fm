@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../../core/storage/firebase_storage_url_resolver.dart';
 import '../../domain/entities/book_entity.dart';
 import '../../domain/entities/category_entity.dart';
 import '../../domain/repositories/home_repository.dart';
@@ -23,12 +24,24 @@ class HomeRepositoryImpl implements HomeRepository {
 
     final selectedCategoryIds = _stringList(userData['favoriteCategoryIds']);
     if (selectedCategoryIds.isEmpty) {
-      return _categoriesFromSavedNames(userData['favoriteCategories']);
+      final savedNames = _categoriesFromSavedNames(
+        userData['favoriteCategories'],
+      );
+      if (savedNames.isNotEmpty) return savedNames;
+
+      // Fallback: Fetch all categories from the interested collection in Firestore
+      final categoriesSnapshot = await _firestore
+          .collection('interested')
+          .limit(10)
+          .get();
+      return categoriesSnapshot.docs
+          .map((snapshot) => _categoryFromSnapshot(snapshot))
+          .toList(growable: false);
     }
 
     final categorySnapshots = await Future.wait(
       selectedCategoryIds.map(
-        (id) => _firestore.collection('categories').doc(id).get(),
+        (id) => _firestore.collection('interested').doc(id).get(),
       ),
     );
 
@@ -48,28 +61,32 @@ class HomeRepositoryImpl implements HomeRepository {
 
       if (snapshot.docs.isEmpty) {
         final allDocs = await _firestore.collection('books').get();
-        return allDocs.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+        return Future.wait(allDocs.docs.map(_bookEntityFromSnapshot));
       }
-      return snapshot.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+      return Future.wait(snapshot.docs.map(_bookEntityFromSnapshot));
     } catch (e) {
       final allDocs = await _firestore.collection('books').get();
-      return allDocs.docs.map((doc) => _bookEntityFromSnapshot(doc)).toList();
+      return Future.wait(allDocs.docs.map(_bookEntityFromSnapshot));
     }
   }
 
-  BookEntity _bookEntityFromSnapshot(
+  Future<BookEntity> _bookEntityFromSnapshot(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  ) async {
     final data = doc.data();
     final contributors = data['contributors'] as List<dynamic>? ?? [];
+    final coverUrl = await FirebaseStorageUrlResolver.resolve(
+      data['imageUrl'] as String? ?? '',
+    );
 
     return BookEntity(
       id: doc.id,
       title: data['title'] as String? ?? '',
       author: _getAuthorFromContributors(contributors),
-      coverUrl: data['imageUrl'] as String? ?? '',
+      coverUrl: coverUrl,
       rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
       duration: _formatDuration(data['duration'] as String? ?? ''),
+      categoryIds: _stringList(data['categoryIds']),
     );
   }
 
@@ -172,7 +189,7 @@ class HomeRepositoryImpl implements HomeRepository {
       id: snapshot.id,
       title: title,
       icon:
-          _nullableStringField(data, const ['icon', 'iconUrl']) ??
+          _nullableStringField(data, const ['icon', 'iconUrl', 'imageUrl']) ??
           _fallbackIconNameFor(snapshot.id, title),
     );
   }

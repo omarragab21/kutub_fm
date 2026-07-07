@@ -32,6 +32,10 @@ migrate_working_dir/
 .pub/
 /build/
 /assets/*
+!/assets/generated/
+/assets/generated/*
+!/assets/generated/book_seoul_camellia_cover_ai.png
+!/assets/generated/kotob_fm_logo.png
 !/assets/fonts/
 /assets/fonts/*
 !/assets/fonts/google_fonts/

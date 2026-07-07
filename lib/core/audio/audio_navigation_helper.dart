@@ -51,8 +51,8 @@ class AudioNavigationHelper {
           arguments: BookReaderScreenArgs(
             pdfAssetPath: bookId,
             bookTitle: bookTitle,
-            audioUrl: audioUrl,
-            chapterId: chapterId,
+            audioUrl: audioUrl ?? '',
+            chapterId: chapterId ?? '',
             bookCoverUrl: bookCoverUrl,
           ),
         );

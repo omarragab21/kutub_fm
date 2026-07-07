@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../viewmodels/reels_view_model.dart';
 import '../widgets/reel_item_widget.dart';
 import '../../../../core/theme/app_theme.dart';
+import 'package:kutub_fm/core/navigation/app_bottom_nav_tab.dart';
+import 'package:kutub_fm/core/navigation/app_navigation_state.dart';
 
 class ReelsFeedPage extends StatelessWidget {
   final String? category;
@@ -25,6 +27,14 @@ class _ReelsFeedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ReelsViewModel>();
+    final navState = context.watch<AppNavigationState>();
+    final isReelsTabActive = navState.selectedTab == AppBottomNavTab.reels;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        context.read<ReelsViewModel>().setPageActive(isReelsTabActive);
+      }
+    });
 
     return Scaffold(
       backgroundColor: Colors.black,

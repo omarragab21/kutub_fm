@@ -59,10 +59,7 @@ class BookMetadata {
   }
 
   bool get isEmpty =>
-      title.isEmpty &&
-      author.isEmpty &&
-      translator.isEmpty &&
-      narrator.isEmpty;
+      title.isEmpty && author.isEmpty && translator.isEmpty && narrator.isEmpty;
 }
 
 class TranscriptDocument {
@@ -112,10 +109,28 @@ class TranscriptSegment {
           ? json['id'] as int
           : int.tryParse(json['id'].toString()) ?? 0,
       text: json['text']?.toString() ?? '',
-      start: (json['start'] as num?)?.toDouble() ?? 0.0,
-      end: (json['end'] as num?)?.toDouble() ?? 0.0,
+      start: _readSeconds(json['start'] ?? json['start_time']),
+      end: _readSeconds(json['end'] ?? json['end_time']),
       type: TranscriptSegmentType.fromString(json['type']?.toString()),
     );
+  }
+
+  static double _readSeconds(Object? value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+
+    final text = value.toString().trim();
+    final numeric = double.tryParse(text);
+    if (numeric != null) return numeric;
+
+    final parts = text.split(':');
+    if (parts.isEmpty) return 0.0;
+
+    var totalSeconds = 0.0;
+    for (final part in parts) {
+      totalSeconds = (totalSeconds * 60) + (double.tryParse(part.trim()) ?? 0);
+    }
+    return totalSeconds;
   }
 
   Map<String, dynamic> toJson() {

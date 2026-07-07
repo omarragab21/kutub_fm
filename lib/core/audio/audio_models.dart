@@ -3,7 +3,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 enum AudioMode { idle, readingAudio, audiobook, fmRadio, podcast }
 
-enum AudioInputType { asset, uri }
+enum AudioInputType { asset, uri, file }
 
 class AudioTrack {
   const AudioTrack({
@@ -51,6 +51,12 @@ class AudioTrack {
           throw ArgumentError('Audio URL is invalid: $source');
         }
         return AudioSource.uri(uri, tag: mediaItem);
+      case AudioInputType.file:
+        final path = source.trim();
+        if (path.isEmpty) {
+          throw ArgumentError('Audio file path is empty.');
+        }
+        return AudioSource.uri(Uri.file(path), tag: mediaItem);
     }
   }
 
@@ -59,7 +65,20 @@ class AudioTrack {
       return null;
     }
 
-    return Uri.tryParse(rawValue.trim());
+    final value = rawValue.trim();
+    if (value.startsWith('/')) {
+      return Uri.file(value);
+    }
+
+    final uri = Uri.tryParse(value);
+    if (uri == null || !uri.hasScheme) {
+      return null;
+    }
+
+    return switch (uri.scheme.toLowerCase()) {
+      'http' || 'https' || 'file' || 'content' => uri,
+      _ => null,
+    };
   }
 }
 

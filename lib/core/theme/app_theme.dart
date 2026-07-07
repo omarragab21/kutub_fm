@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primary = Color(0xFFF2CA50);
@@ -17,6 +16,7 @@ class AppTheme {
   static ThemeData get darkTheme {
     final baseTheme = ThemeData(
       brightness: Brightness.dark,
+      fontFamily: 'ThmanyahSans',
     );
     return baseTheme.copyWith(
       scaffoldBackgroundColor: background,
@@ -30,14 +30,12 @@ class AppTheme {
         onSurfaceVariant: onSurfaceVariant,
         surfaceContainerHighest: surfaceContainerHighest,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme).copyWith(
-        displayLarge: GoogleFonts.cairo(
-          textStyle: baseTheme.textTheme.displayLarge?.copyWith(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: primary,
-            height: 1.2,
-          ),
+      textTheme: baseTheme.textTheme.copyWith(
+        displayLarge: baseTheme.textTheme.displayLarge?.copyWith(
+          fontSize: 48,
+          fontWeight: FontWeight.bold,
+          color: primary,
+          height: 1.2,
         ),
       ),
     );
@@ -46,6 +44,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     final baseTheme = ThemeData(
       brightness: Brightness.light,
+      fontFamily: 'ThmanyahSans',
     );
     return baseTheme.copyWith(
       scaffoldBackgroundColor: const Color(0xFFF9F9F9),
@@ -58,7 +57,6 @@ class AppTheme {
         onSurface: const Color(0xFF131313),
         onSurfaceVariant: const Color(0xFF757575),
       ),
-      textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme),
     );
   }
 }

@@ -18,10 +18,7 @@ class BookDetailsViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isFavorite => _isFavorite;
 
-  BookDetailsViewModel({
-    required this.repository,
-    required this.bookId,
-  }) {
+  BookDetailsViewModel({required this.repository, required this.bookId}) {
     loadBookDetails();
   }
 
@@ -31,16 +28,10 @@ class BookDetailsViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (bookId == 'miah_aam' || bookId.isEmpty || bookId == 'book_late_arrival') {
-        _book = BookDetail.mock();
-      } else {
-        try {
-          _book = await repository.getBookDetails(bookId);
-        } catch (e) {
-          debugPrint('Firestore fetch failed: $e, falling back to mock');
-          _book = BookDetail.mock();
-        }
+      if (bookId.trim().isEmpty) {
+        throw Exception('معرف الكتاب غير صالح');
       }
+      _book = await repository.getBookDetails(bookId.trim());
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && !user.isAnonymous) {
         final favDoc = await FirebaseFirestore.instance
@@ -55,6 +46,7 @@ class BookDetailsViewModel extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = e.toString();
+      _book = null;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -65,7 +57,9 @@ class BookDetailsViewModel extends ChangeNotifier {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.isAnonymous) return;
 
-    final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final userDocRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
     final favDocRef = userDocRef.collection('favorites').doc(bookId);
 
     _isFavorite = !_isFavorite;
@@ -80,14 +74,10 @@ class BookDetailsViewModel extends ChangeNotifier {
           'imageUrl': _book?.imageUrl ?? '',
           'favoritedAt': FieldValue.serverTimestamp(),
         });
-        await userDocRef.update({
-          'favoritesCount': FieldValue.increment(1),
-        });
+        await userDocRef.update({'favoritesCount': FieldValue.increment(1)});
       } else {
         await favDocRef.delete();
-        await userDocRef.update({
-          'favoritesCount': FieldValue.increment(-1),
-        });
+        await userDocRef.update({'favoritesCount': FieldValue.increment(-1)});
       }
     } catch (e) {
       _isFavorite = !_isFavorite;
@@ -105,7 +95,7 @@ class BookDetailsViewModel extends ChangeNotifier {
         timeAgo: 'الآن', // "Now"
         likes: 0,
       );
-      _book!.comments.insert(0, newComment); 
+      _book!.comments.insert(0, newComment);
       notifyListeners();
     }
   }

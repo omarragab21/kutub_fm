@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../audio/audio_provider.dart';
 import '../audio/widgets/global_mini_player.dart';
+import 'widgets/app_bottom_navigation_bar.dart';
 import '../navigation/app_navigation_state.dart';
 import '../routes/app_routes.dart';
 
@@ -28,7 +29,7 @@ class AppShell extends StatelessWidget {
         !keyboardVisible &&
         !hideForRoutes.contains(navigationState.currentRouteName);
     final bottomOffset = navigationState.isCurrentRoute(AppRoutes.home)
-        ? 110.0
+        ? kAppBottomNavigationBarHeight + 12
         : 16.0 + safeBottom;
 
     return Stack(

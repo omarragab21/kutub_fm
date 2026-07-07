@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kutub_fm/features/profile/data/repositories/profile_repository.dart';
 import 'package:kutub_fm/features/profile/presentation/viewmodels/profile_viewmodel.dart';
 import 'package:kutub_fm/features/subscription/data/datasources/apple_pay_data_source.dart';
@@ -32,9 +32,6 @@ import 'package:kutub_fm/features/podcast/presentation/providers/podcast_provide
 // FM radio: `AppRoutes.fmRadio` (list), `AppRoutes.fmStationDetail` (pass `FmStation` as route arguments).
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Disable runtime fetching to use bundled fonts and avoid SocketException
-  GoogleFonts.config.allowRuntimeFetching = false;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -93,24 +90,31 @@ class KutubFmApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final navigationState = context.read<AppNavigationState>();
 
-    return MaterialApp(
-      title: 'كتب FM',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
-      navigatorKey: AppNavigationService.navigatorKey,
-      initialRoute: AppRoutes.splash,
-      onGenerateRoute: AppRoutes.generateRoute,
-      navigatorObservers: [navigationState.observer],
-      builder: (context, child) => AppShell(child: child ?? const SizedBox()),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('ar', 'SA')],
-      locale: const Locale('ar', 'SA'),
+    return ScreenUtilInit(
+      designSize: const Size(375, 812),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'كتب FM',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.dark,
+          navigatorKey: AppNavigationService.navigatorKey,
+          initialRoute: AppRoutes.splash,
+          onGenerateRoute: AppRoutes.generateRoute,
+          navigatorObservers: [navigationState.observer],
+          builder: (context, child) => AppShell(child: child ?? const SizedBox()),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('ar', 'SA')],
+          locale: const Locale('ar', 'SA'),
+        );
+      },
     );
   }
 }

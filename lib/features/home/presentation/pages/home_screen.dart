@@ -1,5 +1,8 @@
+import 'dart:ui';
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:kutub_fm/core/navigation/app_bottom_nav_tab.dart';
 import 'package:kutub_fm/core/navigation/app_navigation_state.dart';
 import 'package:provider/provider.dart';
 import 'package:kutub_fm/features/profile/presentation/pages/profile_screen.dart';
@@ -9,6 +12,9 @@ import "../../../../core/routes/app_routes.dart";
 import "../viewmodels/home_view_model.dart";
 import 'package:kutub_fm/features/profile/presentation/viewmodels/profile_viewmodel.dart';
 import 'package:kutub_fm/features/auth/presentation/providers/auth_provider.dart';
+import 'package:kutub_fm/features/audio_library/presentation/pages/audio_library_screen.dart';
+import '../../domain/entities/book_entity.dart';
+import '../../domain/entities/category_entity.dart';
 
 class DiscoverBook {
   final String id;
@@ -32,61 +38,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _selectedCategory = 'مخصص لك';
+  String _selectedCategoryId = 'for_you';
   final Set<String> _likedBookIds = {};
-
-  final Map<String, List<DiscoverBook>> _discoverBooks = {
-    'مخصص لك': [
-      const DiscoverBook(
-        id: 'disc_1',
-        title: 'تطوير المهارات القيادية',
-        author: 'خالد العتيبي',
-        imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=300&auto=format&fit=crop',
-      ),
-      const DiscoverBook(
-        id: 'disc_2',
-        title: 'فن التفاوض في الأعمال',
-        author: 'ليلى الكردي',
-        imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=300&auto=format&fit=crop',
-      ),
-      const DiscoverBook(
-        id: 'disc_3',
-        title: 'استراتيجيات بناء الثروة',
-        author: 'أحمد الحسين',
-        imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?q=80&w=300&auto=format&fit=crop',
-      ),
-    ],
-    'خيال علمي': [
-      const DiscoverBook(
-        id: 'disc_4',
-        title: 'رحلة إلى المريخ',
-        author: 'سارة الناجي',
-        imageUrl: 'https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?q=80&w=300&auto=format&fit=crop',
-      ),
-      const DiscoverBook(
-        id: 'disc_5',
-        title: 'الذكاء الخارق',
-        author: 'ياسر كمال',
-        imageUrl: 'https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=300&auto=format&fit=crop',
-      ),
-    ],
-    'تشويق': [
-      const DiscoverBook(
-        id: 'disc_6',
-        title: 'خلف الكواليس',
-        author: 'محمد عبد الله',
-        imageUrl: 'https://images.unsplash.com/photo-1509281373149-e957c6296406?q=80&w=300&auto=format&fit=crop',
-      ),
-    ],
-    'رومانسي': [
-      const DiscoverBook(
-        id: 'disc_7',
-        title: 'عهد الحب',
-        author: 'منى فريد',
-        imageUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=300&auto=format&fit=crop',
-      ),
-    ],
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -134,208 +87,350 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        // Custom App Bar
-        _buildSliverAppBar(profileViewModel, authProvider, theme, context),
+    return Container(
+      color: const Color(0xFF040707),
+      child: CustomScrollView(
+        slivers: [
+          // Custom App Bar
+          _buildSliverAppBar(profileViewModel, authProvider, theme, context),
 
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(24, 16, 24, hasMiniPlayer ? 140 : 80),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              // 1. Search Field
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(context, AppRoutes.search),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2C2C2B),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, hasMiniPlayer ? 140 : 80),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // 1. Search Field
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'ابحث عن ما تريد...',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 14,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1F1F1F),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.search,
+                          color: Color(0xFFBDBDBD),
+                          size: 24,
                         ),
-                      ),
-                      Icon(
-                        Icons.search,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        const Text(
+                          'ابحث عن ما تريد...',
+                          style: TextStyle(
+                            color: Color(0xFFBDBDBD),
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
-              // 2. Bento Grid (2x2)
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBentoItem(
-                      title: 'راديو',
-                      icon: Icons.radio_rounded,
-                      primaryColor: theme.colorScheme.primary,
-                      onTap: () => context.read<AppNavigationState>().setSelectedIndex(2),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildBentoItem(
-                      title: 'ريلز',
-                      icon: Icons.play_circle_outline_rounded,
-                      primaryColor: const Color(0xFFE57373),
-                      onTap: () => context.read<AppNavigationState>().setSelectedIndex(3),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBentoItem(
-                      title: 'بودكاست',
-                      icon: Icons.mic_external_on_rounded,
-                      primaryColor: const Color(0xFF64B5F6),
-                      onTap: () => Navigator.pushNamed(context, AppRoutes.podcastList),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildBentoItem(
-                      title: 'مجتمع',
-                      icon: Icons.people_outline_rounded,
-                      primaryColor: const Color(0xFF81C784),
-                      onTap: () => context.read<AppNavigationState>().setSelectedIndex(1),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // 3. Wide Banner (Listen to your favorite channel)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      theme.colorScheme.primary.withValues(alpha: 0.85),
-                      const Color(0xFFE5A93B).withValues(alpha: 0.65),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // 2. Bento Grid (2x2 Category Cards)
+                Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'استمع الى قناتك المفضلة',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              context.read<AppNavigationState>().setSelectedIndex(2);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                            label: const Text(
-                              'تشغيل الراديو',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: _buildCategoryCard(
+                        title: 'بودكاست',
+                        backgroundColor: const Color(0xFFEA5455),
+                        imagePath: 'assets/podcast.png',
+                        onTap: () =>
+                            Navigator.pushNamed(context, AppRoutes.podcastList),
                       ),
                     ),
-                    const Opacity(
-                      opacity: 0.15,
-                      child: Icon(
-                        Icons.radio_rounded,
-                        size: 80,
-                        color: Colors.white,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildCategoryCard(
+                        title: 'كتب',
+                        backgroundColor: const Color(0xFFEA7C54),
+                        imagePath: 'assets/books_icon.png',
+                        onTap: () => context
+                            .read<AppNavigationState>()
+                            .setSelectedTab(AppBottomNavTab.library),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCategoryCard(
+                        title: 'مجتمع',
+                        backgroundColor: const Color(0xFF54A1EA),
+                        imagePath: 'assets/coumnity.png',
+                        onTap: () => context
+                            .read<AppNavigationState>()
+                            .setSelectedTab(AppBottomNavTab.community),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildCategoryCard(
+                        title: 'إذاعة',
+                        backgroundColor: const Color(0xFF2D9F9F),
+                        imagePath: 'assets/radio.png',
+                        onTap: () => context
+                            .read<AppNavigationState>()
+                            .setSelectedTab(AppBottomNavTab.radio),
+                      ),
+                    ),
+                  ],
+                ),
+                // 3. Wide Banner (Listen to your favorite channel)
+                const SizedBox(
+                  height: 32,
+                ), // Add top spacing to match the bottom spacing
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 172,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF333333)),
+                        image: const DecorationImage(
+                          image: AssetImage('assets/podcasst.png'),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: -5,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: SizedBox(
+                          width: 170,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'استمع الى برامجك\nالمفضلة',
+                                style: TextStyle(
+                                  color: Color(0xFFF4F4F4),
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'حلقات حصرية على تطبيق كتب FM',
+                                style: TextStyle(
+                                  color: Color(0xFFBDBDBD),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.podcastList,
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFBD10),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SvgPicture.asset(
+                                        'assets/nav_radio.svg',
+                                        colorFilter: const ColorFilter.mode(
+                                          Color(0xFF1F1F1F),
+                                          BlendMode.srcIn,
+                                        ),
+                                        width: 20,
+                                        height: 20,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'تشغيل البودكاست',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF1F1F1F),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+
+                // 4. Continue Reading Header
+                _buildSectionHeader(
+                  theme,
+                  'تابع القراءة',
+                  'متابعة الكل',
+                  onActionPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.search);
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 5. Continue Reading Book Card
+                _buildContinueReadingCard(
+                  theme,
+                  context,
+                  viewModel,
+                  profileViewModel,
+                ),
+                const SizedBox(height: 20),
+
+                // 6. Discover a New World Header
+                _buildSectionHeader(
+                  theme,
+                  'اكتشف عالم جديد',
+                  'عرض الجميع',
+                  onActionPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.bookWorld);
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 7. Discover Categories Tab List
+                _buildDiscoverCategories(theme, viewModel),
+                const SizedBox(height: 16),
+
+                // 8. Discover Books Carousel list
+                _buildDiscoverBooksList(theme, context, viewModel),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard({
+    required String title,
+    required Color backgroundColor,
+    required String imagePath,
+    required VoidCallback onTap,
+  }) {
+    double imgSize = 90;
+    double imgLeft = -10;
+    double imgBottom = -10;
+    double rotationAngle = 0;
+
+    if (title == 'بودكاست') {
+      imgSize = 112;
+      imgLeft = -35;
+      imgBottom = -30;
+      rotationAngle = -30 * 3.14159265 / 180;
+    } else if (title == 'كتب') {
+      imgSize = 90;
+      imgLeft = -5;
+      imgBottom = -20;
+      rotationAngle = 5 * 3.14159265 / 180;
+    } else if (title == 'مجتمع') {
+      imgSize = 100;
+      imgLeft = -25;
+      imgBottom = -25;
+      rotationAngle = 12 * 3.14159265 / 180;
+    } else if (title == 'إذاعة') {
+      imgSize = 95;
+      imgLeft = -10;
+      imgBottom = -20;
+      rotationAngle = 12 * 3.14159265 / 180;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 32),
-
-              // 4. Continue Reading Header
-              _buildSectionHeader(
-                theme,
-                'تابع القراءة',
-                'متابعة الكل >',
-                onActionPressed: () {
-                  Navigator.pushNamed(context, AppRoutes.search);
-                },
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-
-              // 5. Continue Reading Book Card
-              _buildContinueReadingCard(theme, context),
-              const SizedBox(height: 32),
-
-              // 6. Discover a New World Header
-              _buildSectionHeader(
-                theme,
-                'اكتشف عالم جديد',
-                'عرض الجميع >',
-                onActionPressed: () {
-                  Navigator.pushNamed(context, AppRoutes.search);
-                },
+            ),
+            Positioned(
+              left: imgLeft,
+              bottom: imgBottom,
+              child: Transform.rotate(
+                angle: rotationAngle,
+                child: Image.asset(
+                  imagePath,
+                  height: imgSize,
+                  width: imgSize,
+                  fit: BoxFit.contain,
+                ),
               ),
-              const SizedBox(height: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // 7. Discover Categories Tab List
-              _buildDiscoverCategories(theme),
-              const SizedBox(height: 16),
-
-              // 8. Discover Books Carousel list
-              _buildDiscoverBooksList(theme, context),
-            ]),
+  Widget _buildCircleActionButton({
+    required String assetPath,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF1F1F1F),
+        ),
+        child: Center(
+          child: SvgPicture.asset(
+            assetPath,
+            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            width: 24,
+            height: 24,
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -347,13 +442,15 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 80,
-      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.6),
+      expandedHeight: 60,
+      backgroundColor: const Color(0xFF040707),
+      elevation: 0,
+      scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left side: Avatar + KutubFM Logo
+          // Right side (RTL): Avatar + Name
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -361,55 +458,55 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
                   );
                 },
-                child: _buildAvatarWidget(profileViewModel, authProvider, theme),
+                child: _buildAvatarWidget(
+                  profileViewModel,
+                  authProvider,
+                  theme,
+                ),
               ),
-              const SizedBox(width: 12),
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  children: [
-                    const TextSpan(text: 'Kutub'),
-                    TextSpan(
-                      text: 'FM',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary, // Gold/primary color
-                        fontSize: 12,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 4),
+              Text(
+                profileViewModel.profile?.name ?? 'سامي عامر',
+                style: const TextStyle(
+                  color: Color(0xFFF4F4F4),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w400,
+                  height: 1.55,
                 ),
               ),
             ],
           ),
 
-          // Right side: Stats + Notifications Bell
+          // Left side (RTL): Actions (Notification on right, Library on far left)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: Icon(Icons.bar_chart_rounded, color: theme.colorScheme.primary, size: 24),
+              _buildCircleActionButton(
+                assetPath: 'assets/notifiaction.svg',
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('إحصائيات القراءة ستتوفر قريباً!', textDirection: TextDirection.rtl),
+                      content: Text(
+                        'لا توجد إشعارات جديدة حالياً.',
+                        textDirection: TextDirection.rtl,
+                      ),
                     ),
                   );
                 },
               ),
-              IconButton(
-                icon: Icon(Icons.notifications_none_rounded, color: theme.colorScheme.primary, size: 24),
+              const SizedBox(width: 8),
+              _buildCircleActionButton(
+                assetPath: 'assets/libraries.svg',
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('لا توجد إشعارات جديدة حالياً.', textDirection: TextDirection.rtl),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AudioLibraryScreen(),
                     ),
                   );
                 },
@@ -445,7 +542,9 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                theme.colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -455,7 +554,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2. Error or Guest / Unauthenticated State
     final profile = profileViewModel.profile;
     if (profile == null || profileViewModel.status == ProfileStatus.error) {
-      final name = authProvider.isGuest ? 'زائر' : (authProvider.user?.displayName ?? 'مستخدم');
+      final name = authProvider.isGuest
+          ? 'زائر'
+          : (authProvider.user?.displayName ?? 'مستخدم');
       return _buildFallbackAvatar(name, theme);
     }
 
@@ -492,9 +593,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     strokeWidth: 1.5,
                     value: loadingProgress.expectedTotalBytes != null
                         ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
+                              loadingProgress.expectedTotalBytes!
                         : null,
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -556,82 +659,252 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text(
           title,
-          style: theme.textTheme.displayLarge?.copyWith(fontSize: 24),
+          style: const TextStyle(
+            color: Color(0xFFF4F4F4),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         if (actionText.isNotEmpty)
           TextButton(
             onPressed: onActionPressed ?? () {},
-            child: Text(
-              actionText,
-              style: TextStyle(color: theme.colorScheme.primary, fontSize: 14),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  actionText,
+                  style: const TextStyle(
+                    color: Color(0xFFBDBDBD),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 22,
+                  color: Color(0xFFBDBDBD),
+                ),
+              ],
             ),
           ),
       ],
     );
   }
 
-  Widget _buildBentoItem({
+  Widget _buildSingleContinueReadingCard({
+    required BuildContext context,
+    required String bookId,
     required String title,
-    required IconData icon,
-    required Color primaryColor,
-    required VoidCallback onTap,
+    required String author,
+    required String coverUrl,
+    required double progress,
+    required String chapterId,
+    required String buttonText,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 110,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2B),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.05),
-          ),
-        ),
-        child: Stack(
+    final hasProgress = progress > 0;
+    final displayProgress = hasProgress ? progress : 0.75;
+    final isLiked = _likedBookIds.contains(bookId);
+
+    return Container(
+      width: 340,
+      height: 145, // increased height from 129 to 145
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Abstract shape
-            Positioned(
-              bottom: -20,
-              left: -20,
-              child: Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: primaryColor.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -10,
-              left: -10,
-              child: Container(
-                width: 45,
-                height: 45,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: primaryColor.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(
-                    icon,
-                    color: primaryColor,
-                    size: 26,
+            // Cover Image (right in RTL) - Put it first so it is laid out on the right
+            Container(
+              width: 95,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                ],
+                image: DecorationImage(
+                  image: coverUrl.isEmpty
+                      ? const AssetImage('assets/book.png') as ImageProvider
+                      : (coverUrl.startsWith('assets/')
+                            ? AssetImage(coverUrl) as ImageProvider
+                            : NetworkImage(coverUrl) as ImageProvider),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Details (left in RTL)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment
+                    .start, // Align to right (start of RTL is right)
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title & Author on the right (RTL) - Put it first so it is laid out on the right
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start, // Align right in RTL
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFF4F4F4),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              author,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFBDBDBD),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Love / Favorite button on the left (RTL) - Put it second so it is laid out on the left
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            if (isLiked) {
+                              _likedBookIds.remove(bookId);
+                            } else {
+                              _likedBookIds.add(bookId);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            isLiked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            color: isLiked
+                                ? Colors.red
+                                : const Color(0xFFBDBDBD),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Progress and percentage
+                  Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start, // Align right in RTL
+                    children: [
+                      Text(
+                        '${(displayProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          color: Color(0xFFBDBDBD),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: SizedBox(
+                          height: 3,
+                          child: LinearProgressIndicator(
+                            value: displayProgress,
+                            backgroundColor: const Color(0xFF393939),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFFC5C5C5),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(
+                    height: 5,
+                  ), // Spacer replaced by SizedBox of 5 as requested
+                  // Yellow Button
+                  GestureDetector(
+                    onTap: () {
+                      if (chapterId.isEmpty) {
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.bookDetails,
+                          arguments: bookId,
+                        );
+                        return;
+                      }
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.bookReader,
+                        arguments: BookReaderScreenArgs(
+                          pdfAssetPath: bookId,
+                          bookTitle: title,
+                          audioUrl: '',
+                          chapterId: chapterId,
+                          transcript: null,
+                          bookCoverUrl: coverUrl,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFBD10),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/nav_books.svg',
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFF1F1F1F),
+                              BlendMode.srcIn,
+                            ),
+                            width: 16,
+                            height: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            buttonText,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1F1F1F),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -643,176 +916,116 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildContinueReadingCard(ThemeData theme, BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C2C2B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Cover Image (on the right in RTL)
-          Container(
-            width: 80,
-            height: 110,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-              image: const DecorationImage(
-                image: AssetImage('assets/miah_aam_cover.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
+  Widget _buildContinueReadingCard(
+    ThemeData theme,
+    BuildContext context,
+    HomeViewModel viewModel,
+    ProfileViewModel profileViewModel,
+  ) {
+    final continueListening = profileViewModel.profile?.continueListening ?? [];
+    final List<Map<String, dynamic>> items = [];
 
-          // 2. Details (on the left in RTL)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'مئة عام من العزلة',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'أحمد خالد توفيق',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 12),
+    if (continueListening.isNotEmpty) {
+      for (final item in continueListening) {
+        items.add({
+          'bookId': item.id,
+          'title': item.title,
+          'author': item.author,
+          'coverUrl': item.coverUrl,
+          'progress': item.progress,
+          'chapterId': item.lastChapter.trim(),
+          'buttonText': 'إكمال القراءة',
+        });
+      }
+    } else if (viewModel.recommendedBooks.isNotEmpty) {
+      final count = viewModel.recommendedBooks.length >= 2
+          ? 2
+          : viewModel.recommendedBooks.length;
+      for (var i = 0; i < count; i++) {
+        final item = viewModel.recommendedBooks[i];
+        items.add({
+          'bookId': item.id,
+          'title': item.title,
+          'author': item.author,
+          'coverUrl': item.coverUrl,
+          'progress': 0.75 - (i * 0.3),
+          'chapterId': '',
+          'buttonText': 'إكمال القراءة',
+        });
+      }
+    }
 
-                // Progress Indicator
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: 0.75,
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                          minHeight: 6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '٧٥٪',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-                // Resume Reading Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.bookReader,
-                        arguments: const BookReaderScreenArgs(
-                          pdfAssetPath: 'miah_aam',
-                          bookTitle: 'مئة عام من العزلة',
-                          audioUrl: '',
-                          chapterId: 'ch1',
-                          transcript: 'الفصل الأول من رواية مئة عام من العزلة...',
-                          bookCoverUrl: 'assets/miah_aam_cover.png',
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                      foregroundColor: theme.colorScheme.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.menu_book_rounded, size: 18),
-                    label: const Text(
-                      'استكمال القراءة',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return SizedBox(
+      height: 145, // increased height to 145 to match card
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return _buildSingleContinueReadingCard(
+            context: context,
+            bookId: item['bookId'],
+            title: item['title'],
+            author: item['author'],
+            coverUrl: item['coverUrl'],
+            progress: item['progress'],
+            chapterId: item['chapterId'],
+            buttonText: item['buttonText'],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDiscoverCategories(ThemeData theme) {
-    final categories = ['مخصص لك', 'خيال علمي', 'تشويق', 'رومانسي'];
+  Widget _buildDiscoverCategories(ThemeData theme, HomeViewModel viewModel) {
+    final categories = [
+      HomeCategory(id: 'for_you', title: 'مخصص لك', icon: ''),
+      ...viewModel.categories,
+    ];
     return SizedBox(
-      height: 40,
+      height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final cat = categories[index];
-          final isSelected = _selectedCategory == cat;
+          final isSelected = _selectedCategoryId == cat.id;
           return GestureDetector(
             onTap: () {
               HapticFeedback.selectionClick();
               setState(() {
-                _selectedCategory = cat;
+                _selectedCategoryId = cat.id;
               });
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? theme.colorScheme.primary
-                    : const Color(0xFF2C2C2B),
-                borderRadius: BorderRadius.circular(20),
+                    ? const Color(0xFFFFBD10)
+                    : const Color(0xFF1F1F1F),
+                borderRadius: BorderRadius.circular(26),
                 border: Border.all(
                   color: isSelected
-                      ? theme.colorScheme.primary
-                      : Colors.white.withValues(alpha: 0.05),
+                      ? const Color(0xFFFFBD10)
+                      : const Color(0xFF333333),
                 ),
               ),
               child: Center(
                 child: Text(
-                  cat,
+                  cat.title,
                   style: TextStyle(
-                    color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.7),
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
+                    color: isSelected
+                        ? const Color(0xFF1F1F1F)
+                        : const Color(0xFFF4F4F4),
+                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                    fontSize: 14,
+                    height: 1.5,
                   ),
                 ),
               ),
@@ -823,19 +1036,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDiscoverBooksList(ThemeData theme, BuildContext context) {
-    final books = _discoverBooks[_selectedCategory] ?? [];
+  Widget _buildDiscoverBooksList(
+    ThemeData theme,
+    BuildContext context,
+    HomeViewModel viewModel,
+  ) {
+    final List<BookEntity> books;
+    if (_selectedCategoryId == 'for_you') {
+      books = viewModel.recommendedBooks;
+    } else {
+      books = viewModel.recommendedBooks
+          .where((book) => book.categoryIds.contains(_selectedCategoryId))
+          .toList();
+    }
+
     if (books.isEmpty) {
       return const SizedBox(
         height: 200,
         child: Center(
-          child: Text('لا توجد كتب في هذا القسم حالياً'),
+          child: Text(
+            'لا توجد كتب في هذا القسم حالياً',
+            textDirection: TextDirection.rtl,
+          ),
         ),
       );
     }
 
     return SizedBox(
-      height: 240,
+      height: 220,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: books.length,
@@ -843,36 +1071,35 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final book = books[index];
           final isLiked = _likedBookIds.contains(book.id);
+
+          final isCoverAsset = book.coverUrl.startsWith('assets/');
+          final imageProvider = isCoverAsset
+              ? AssetImage(book.coverUrl) as ImageProvider
+              : NetworkImage(book.coverUrl) as ImageProvider;
+
           return SizedBox(
-            width: 120,
+            width: 107,
             child: GestureDetector(
               onTap: () {
                 Navigator.pushNamed(
                   context,
                   AppRoutes.bookDetails,
-                  arguments: 'miah_aam',
+                  arguments: book.id,
                 );
               },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Cover Image with Heart icon
+                  // Cover Image with Glassmorphic Heart icon
                   Stack(
                     children: [
                       Container(
-                        width: 120,
-                        height: 160,
+                        width: 107,
+                        height: 148,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(8),
                           image: DecorationImage(
-                            image: NetworkImage(book.imageUrl),
+                            image: imageProvider,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -891,16 +1118,27 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                             });
                           },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black.withValues(alpha: 0.4),
-                            ),
-                            child: Icon(
-                              isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              color: isLiked ? Colors.red : Colors.white,
-                              size: 18,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(30),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 2.5,
+                                sigmaY: 2.5,
+                              ),
+                              child: Container(
+                                width: 27,
+                                height: 27,
+                                color: Colors.white.withValues(alpha: 0.2),
+                                child: Center(
+                                  child: Icon(
+                                    isLiked
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: isLiked ? Colors.red : Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -913,9 +1151,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     book.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: const TextStyle(
+                      color: Color(0xFFF4F4F4),
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -924,9 +1164,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     book.author,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    style: const TextStyle(
+                      color: Color(0xFFBDBDBD),
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 1.5,
                     ),
                   ),
                 ],

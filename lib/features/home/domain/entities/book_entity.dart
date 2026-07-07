@@ -5,6 +5,7 @@ class BookEntity {
   final String coverUrl;
   final double rating;
   final String duration;
+  final List<String> categoryIds;
 
   BookEntity({
     required this.id,
@@ -13,5 +14,6 @@ class BookEntity {
     required this.coverUrl,
     required this.rating,
     required this.duration,
+    required this.categoryIds,
   });
 }
