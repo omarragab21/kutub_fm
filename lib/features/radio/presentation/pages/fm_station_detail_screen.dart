@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/audio/audio_provider.dart';
 import '../../../../core/audio/audio_models.dart';
+import '../../data/datasources/firebase_fm_radio_data_source.dart';
 import '../../domain/fm_station.dart';
 import '../provider/fm_radio_provider.dart';
 
@@ -28,7 +30,9 @@ class _FmStationDetailScreenState extends State<FmStationDetailScreen> {
     // Start a timer to mock the live elapsed duration counter if playing
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final audioProvider = context.read<AudioProvider>();
-      final isFmPlaying = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isPlaying;
+      final isFmPlaying =
+          audioProvider.currentMode == AudioMode.fmRadio &&
+          audioProvider.isPlaying;
       if (isFmPlaying) {
         if (mounted) {
           setState(() {
@@ -41,7 +45,8 @@ class _FmStationDetailScreenState extends State<FmStationDetailScreen> {
     // Automatically trigger play if not already playing this station
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final audioProvider = context.read<AudioProvider>();
-      if (audioProvider.currentMode != AudioMode.fmRadio || audioProvider.currentStation?.id != widget.station.id) {
+      if (audioProvider.currentMode != AudioMode.fmRadio ||
+          audioProvider.currentStation?.id != widget.station.id) {
         _radioProvider.playStation(widget.station);
       }
     });
@@ -63,49 +68,60 @@ class _FmStationDetailScreenState extends State<FmStationDetailScreen> {
   Widget build(BuildContext context) {
     final radioProvider = context.watch<FmRadioProvider>();
     final audioProvider = context.watch<AudioProvider>();
-    final isPlaying = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isPlaying;
-    final isLoading = audioProvider.currentMode == AudioMode.fmRadio && audioProvider.isLoading;
+    final isPlaying =
+        audioProvider.currentMode == AudioMode.fmRadio &&
+        audioProvider.isPlaying;
+    final isLoading =
+        audioProvider.currentMode == AudioMode.fmRadio &&
+        audioProvider.isLoading;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.black,
         body: Container(
           decoration: const BoxDecoration(
             gradient: RadialGradient(
-              center: Alignment.center,
-              radius: 1.2,
-              colors: [
-                Color(0xFF3D1313), // Deep radiant red/brown center
-                Color(0xFF090806), // Very dark outer layer
-              ],
+              center: Alignment(0.47, -0.00),
+              radius: 1.00,
+              colors: [Color(0xFFF46D6E), Colors.black],
             ),
           ),
           child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Premium Top Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                  child: Row(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+
+                  // Top Navigation Bar
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Back Button on the far right in RTL
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
-                          onPressed: () => Navigator.pop(context),
+                      // Share Button (Circular) on the right (first child in RTL)
+                      GestureDetector(
+                        onTap: () {},
+                        child: Container(
+                          width: 41,
+                          height: 41,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: SvgPicture.asset(
+                              'assets/share.svg',
+                              width: 18,
+                              height: 18,
+                              colorFilter: const ColorFilter.mode(
+                                Colors.white,
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      // Screen Title in center
+
+                      // Title
                       const Text(
                         'البث المباشر',
                         style: TextStyle(
@@ -115,235 +131,420 @@ class _FmStationDetailScreenState extends State<FmStationDetailScreen> {
                           fontFamily: 'ThmanyahSans',
                         ),
                       ),
-                      // Share icon on the far left in RTL
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
-                          onPressed: () {},
+
+                      // Back Button (Circular) on the left (third child in RTL)
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 41,
+                          height: 41,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
 
-                const Spacer(),
+                  const SizedBox(height: 24),
 
-                // Retro TV/Radio Cover Frame
-                Center(
-                  child: Stack(
+                  // Cover Image & Overlapping Badge Stack
+                  Stack(
                     alignment: Alignment.topCenter,
                     clipBehavior: Clip.none,
                     children: [
-                      // Main Album/Radio Frame
+                      // Cover Image Container
                       Container(
-                        width: 280,
-                        height: 280,
-                        margin: const EdgeInsets.only(top: 16),
+                        width: 240,
+                        height: 309,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFF333333), width: 1.5),
-                          image: DecorationImage(
-                            image: AssetImage(widget.station.coverImageUrl.isNotEmpty 
-                                ? widget.station.coverImageUrl 
-                                : 'assets/generated/kotob_fm_logo.png'),
-                            fit: BoxFit.cover,
-                          ),
+                          borderRadius: BorderRadius.circular(21),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.red.withOpacity(0.15),
-                              blurRadius: 30,
-                              spreadRadius: 5,
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
                           ],
+                          image: DecorationImage(
+                            image: widget.station.coverImageUrl.startsWith('http')
+                                ? NetworkImage(widget.station.coverImageUrl)
+                                : AssetImage(
+                                    widget.station.coverImageUrl.isNotEmpty
+                                        ? widget.station.coverImageUrl
+                                        : 'assets/generated/kotob_fm_logo.png',
+                                  ) as ImageProvider,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
-                      // Glowing Red LIVE Badge overlapping top center
+
+                      // Overlapping LIVE Badge
                       Positioned(
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF4B4B),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFF4B4B).withOpacity(0.4),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
+                        top: -15,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 72),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0x4CF84749),
+                              border: Border.all(
+                                width: 1,
+                                color: const Color(0xFFF36C6D),
                               ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.circle, color: Colors.white, size: 8),
-                              SizedBox(width: 6),
-                              Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  fontFamily: 'ThmanyahSans',
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Station Title & Subtitle
-                Text(
-                  widget.station.name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'ThmanyahSans',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.station.tagline,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 14,
-                    fontFamily: 'ThmanyahSans',
-                  ),
-                ),
-
-                const Spacer(flex: 2),
-
-                // Custom Red Progress Bar Slider
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 4.0,
-                          activeTrackColor: const Color(0xFFFF4B4B),
-                          inactiveTrackColor: Colors.white.withOpacity(0.1),
-                          thumbColor: const Color(0xFFFF4B4B),
-                          overlayColor: const Color(0xFFFF4B4B).withOpacity(0.2),
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
-                        ),
-                        child: Slider(
-                          value: isPlaying ? 0.75 : 0.0,
-                          onChanged: (val) {},
-                        ),
-                      ),
-                      // Timing indicator Row
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // "LIVE" status on the right (RTL layout)
-                            const Row(
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Icon(Icons.circle, color: Color(0xFFFF4B4B), size: 8),
-                                SizedBox(width: 6),
                                 Text(
-                                  'مباشر',
+                                  '● LIVE',
+                                  textAlign: TextAlign.right,
                                   style: TextStyle(
-                                    color: Color(0xFFFF4B4B),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    color: Color(0xFFFF5A5A),
+                                    fontSize: 14,
                                     fontFamily: 'ThmanyahSans',
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.50,
                                   ),
                                 ),
                               ],
                             ),
-                            // Elapsed duration on the left (RTL layout)
-                            Text(
-                              isPlaying ? _formatListeningTime(_listeningSeconds) : '00:00',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                                fontFamily: 'ThmanyahSans',
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
 
-                const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                // Controls: Backward 10s, Play/Pause/Stop, Forward 10s
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Backward 10s button
-                    IconButton(
-                      icon: const Icon(Icons.replay_10_rounded),
-                      color: Colors.white54,
-                      iconSize: 32,
-                      onPressed: () {},
+                  // Station Name Info
+                  Text(
+                    widget.station.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontFamily: 'ThmanyahSans',
+                      fontWeight: FontWeight.w700,
+                      height: 1.50,
                     ),
-                    const SizedBox(width: 32),
-                    // Main Play/Stop Button
-                    GestureDetector(
-                      onTap: () {
-                        if (isPlaying) {
-                          radioProvider.stop();
-                        } else {
-                          radioProvider.playStation(widget.station);
-                        }
-                      },
-                      child: Container(
-                        width: 76,
-                        height: 76,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF4B4B),
-                          shape: BoxShape.circle,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.station.tagline,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 14,
+                      fontFamily: 'ThmanyahSans',
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Custom Progress Slider & Duration info
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Custom Progress Bar
+                      Container(
+                        width: double.infinity,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(11),
                         ),
-                        child: Center(
-                          child: isLoading
-                              ? const CircularProgressIndicator(color: Colors.black)
-                              : Icon(
-                                  isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                                  color: Colors.black,
-                                  size: 38,
-                                ),
+                        child: Align(
+                          alignment:
+                              Alignment.centerRight, // RTL starting point
+                          child: FractionallySizedBox(
+                            widthFactor: isPlaying ? 0.75 : 0.0,
+                            child: Container(
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF36C6D),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 32),
-                    // Forward 10s button
-                    IconButton(
-                      icon: const Icon(Icons.forward_10_rounded),
-                      color: Colors.white54,
-                      iconSize: 32,
-                      onPressed: () {},
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 8),
 
-                const SizedBox(height: 48),
-              ],
+                      // Timings Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Elapsed Counter on the right in RTL layout
+                          Text(
+                            isPlaying
+                                ? _formatListeningTime(_listeningSeconds)
+                                : '00:00',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: 'ThmanyahSans',
+                              fontWeight: FontWeight.w400,
+                              height: 1.50,
+                            ),
+                          ),
+
+                          // Live indicator on the left in RTL layout
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF36C6D),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: Color(0xFFF36C6D),
+                                  fontSize: 14,
+                                  fontFamily: 'ThmanyahSans',
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.50,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Controls Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Replay 10s
+                      IconButton(
+                        icon: SvgPicture.asset(
+                          'assets/replay_10.svg',
+                          width: 30,
+                          height: 30,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        onPressed: () {},
+                      ),
+                      const SizedBox(width: 22),
+
+                      // Play Button
+                      GestureDetector(
+                        onTap: () {
+                          if (isPlaying) {
+                            radioProvider.stop();
+                          } else {
+                            radioProvider.playStation(widget.station);
+                          }
+                        },
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF46D6E),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 30,
+                                    height: 30,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 3,
+                                    ),
+                                  )
+                                : SvgPicture.asset(
+                                    isPlaying
+                                        ? 'assets/pause.svg'
+                                        : 'assets/play.svg',
+                                    width: 30,
+                                    height: 30,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 22),
+
+                      // Forward 10s
+                      IconButton(
+                        icon: SvgPicture.asset(
+                          'assets/forward_10.svg',
+                          width: 30,
+                          height: 30,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Programs & Episodes Section
+                  _buildProgramsSection(context, radioProvider),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgramsSection(
+    BuildContext context,
+    FmRadioProvider radioProvider,
+  ) {
+    final programs = widget.station.programs.isNotEmpty
+        ? widget.station.programs
+        : FirebaseFmRadioDataSource.defaultKutubFmStation.programs;
+
+    if (programs.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            'برامج الإذاعة والحلقات',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontFamily: 'ThmanyahSans',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        for (final program in programs) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              program.title,
+              style: const TextStyle(
+                color: Color(0xFFF36C6D),
+                fontSize: 16,
+                fontFamily: 'ThmanyahSans',
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          for (final audio in program.audios)
+            _buildProgramEpisodeTile(
+              context,
+              radioProvider,
+              program,
+              audio,
+            ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildProgramEpisodeTile(
+    BuildContext context,
+    FmRadioProvider radioProvider,
+    RadioProgram program,
+    RadioAudio audio,
+  ) {
+    final isPlayingEpisode = radioProvider.isEpisodePlaying(audio.id);
+
+    return GestureDetector(
+      onTap: () {
+        radioProvider.playRadioEpisode(
+          station: widget.station,
+          program: program,
+          audio: audio,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: isPlayingEpisode
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14.0),
+          border: Border.all(
+            color: isPlayingEpisode
+                ? const Color(0xFFF36C6D)
+                : Colors.white.withValues(alpha: 0.10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isPlayingEpisode
+                  ? Icons.pause_circle_filled_rounded
+                  : Icons.play_circle_fill_rounded,
+              color: const Color(0xFFF36C6D),
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    audio.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: isPlayingEpisode
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      fontFamily: 'ThmanyahSans',
+                    ),
+                  ),
+                  if (audio.subtitle != null && audio.subtitle!.isNotEmpty)
+                    Text(
+                      audio.subtitle!,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 12,
+                        fontFamily: 'ThmanyahSans',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

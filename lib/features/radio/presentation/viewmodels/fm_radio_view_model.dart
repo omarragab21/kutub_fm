@@ -93,7 +93,8 @@ class FmRadioViewModel extends ChangeNotifier {
     if (audioProvider == null) return;
 
     if (currentStation?.id == station.id &&
-        audioProvider.currentMode == AudioMode.fmRadio) {
+        audioProvider.currentMode == AudioMode.fmRadio &&
+        (audioProvider.currentTrack?.isLive ?? false)) {
       await audioProvider.togglePlayPause();
       return;
     }
@@ -106,6 +107,40 @@ class FmRadioViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> playRadioEpisode({
+    required FmStation station,
+    required RadioProgram program,
+    required RadioAudio audio,
+  }) async {
+    final audioProvider = _audioProvider;
+    if (audioProvider == null) return;
+
+    if (audioProvider.currentMode == AudioMode.fmRadio &&
+        audioProvider.currentTrack?.id == audio.id) {
+      await audioProvider.togglePlayPause();
+      return;
+    }
+
+    try {
+      await audioProvider.playRadioAudioEpisode(
+        station: station,
+        program: program,
+        audio: audio,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('FM Radio Episode Play Error: $error\n$stackTrace');
+      _errorMessage = 'تعذر تشغيل هذه الحلقة حالياً.';
+      notifyListeners();
+    }
+  }
+
+  bool isEpisodePlaying(String audioId) {
+    return _audioProvider?.currentMode == AudioMode.fmRadio &&
+        _audioProvider?.currentTrack?.id == audioId &&
+        (_audioProvider?.isPlaying ?? false);
+  }
+
 
   Future<void> togglePlayPause() async {
     await _audioProvider?.togglePlayPause();

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../domain/entities/reader_sentence.dart';
-import '../../data/models/transcript_segment.dart';
 import '../../data/services/transcript_loader.dart';
 
 class BookReaderViewModel extends ChangeNotifier {
@@ -101,7 +100,7 @@ class BookReaderViewModel extends ChangeNotifier {
   Future<void> shareSelectedSentence() async {
     if (_activeSentenceId != null && _activeSentenceId! < _sentences.length) {
       final textToShare = _sentences[_activeSentenceId!].text;
-      await Share.share('"$textToShare"');
+      await SharePlus.instance.share(ShareParams(text: '"$textToShare"'));
       _activeSentenceId = null;
       notifyListeners();
     }

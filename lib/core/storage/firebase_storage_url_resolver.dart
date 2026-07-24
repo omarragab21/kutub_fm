@@ -11,14 +11,39 @@ class FirebaseStorageUrlResolver {
 
   static Future<String> resolve(String rawUrl) async {
     final trimmed = rawUrl.trim();
-    if (trimmed.isEmpty || trimmed.startsWith('assets/')) {
+    
+    // Handle empty or invalid URLs
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    
+    // Handle asset URLs
+    if (trimmed.startsWith('assets/')) {
       return trimmed;
+    }
+    
+    // Handle malformed file:// URLs
+    if (trimmed.startsWith('file:///') && trimmed.length <= 8) {
+      debugPrint('Invalid file URL detected: $trimmed');
+      return '';
+    }
+    
+    // Handle file:// URLs that aren't local assets
+    if (trimmed.startsWith('file://')) {
+      debugPrint('File URL passed to NetworkImage resolver: $trimmed');
+      return ''; // Return empty to prevent NetworkImage error
     }
 
     final cached = _cache[trimmed];
     if (cached != null) return cached;
 
     if (_isTokenizedFirebaseDownloadUrl(trimmed)) {
+      return trimmed;
+    }
+
+    // If already a valid HTTP/HTTPS URL, return as-is for NetworkImage
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      _cache[trimmed] = trimmed;
       return trimmed;
     }
 

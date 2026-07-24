@@ -199,7 +199,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         Text(
                           'أضف صورتك واسمك، ودع رحلتك بين الكتب والحكايات تبدأ بهويتك التي تميزك.',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 16,
                             height: 1.5,
                           ),
@@ -221,7 +221,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                     border: Border.all(
                                       color: const Color(
                                         0xFFFFC00E,
-                                      ).withOpacity(0.2),
+                                      ).withValues(alpha: 0.2),
                                       width: 2,
                                     ),
                                   ),
@@ -289,7 +289,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 width: 1.0,
                               ),
                             ),
@@ -359,13 +359,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             children: [
                               Icon(
                                 Icons.chevron_left,
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 size: 18,
                               ),
                               Text(
                                 'عودة للخلف',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),

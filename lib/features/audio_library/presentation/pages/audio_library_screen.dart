@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../viewmodels/audio_library_viewmodel.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../../book_reader/presentation/pages/book_reader_screen.dart';
+import 'package:provider/provider.dart';
+
+import '../viewmodels/audio_library_viewmodel.dart';
 
 class AudioLibraryScreen extends StatelessWidget {
   const AudioLibraryScreen({super.key});
@@ -25,6 +24,8 @@ class _AudioLibraryContent extends StatefulWidget {
 }
 
 class _AudioLibraryContentState extends State<_AudioLibraryContent> {
+  static const _bookReaderRouteName = '/book_reader';
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<AudioLibraryViewModel>();
@@ -66,7 +67,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                         color: Color(0xFFF4F4F4),
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'thmanyah_sans',
+                        fontFamily: 'ThmanyahSans',
                       ),
                     ),
                     const SizedBox(width: 44), // Placeholder to balance
@@ -74,7 +75,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 ),
               ),
 
-              // Tab Selector (المفضلة, التنزيلات, الإشارات)
+              // Primary library sections.
               _buildTabSelector(viewModel),
               const SizedBox(height: 16),
 
@@ -93,23 +94,17 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
   }
 
   Widget _buildTabSelector(AudioLibraryViewModel viewModel) {
-    // Tabs ordered according to Figma (right to left):
-    // 0 = المفضلة, 1 = التنزيلات, 2 = الإشارات
+    // Tabs ordered according to Figma (right to left).
     final tabs = [
       {
         'title': 'المفضلة',
         'icon': Icons.favorite,
-        'inactiveIcon': Icons.favorite_border_rounded
-      },
-      {
-        'title': 'التنزيلات',
-        'icon': Icons.file_download_outlined, // Wait, figma download icon is download-01 (two components). We use standard download icon.
-        'inactiveIcon': Icons.file_download_outlined
+        'inactiveIcon': Icons.favorite_border_rounded,
       },
       {
         'title': 'الإشارات',
-        'icon': Icons.bookmark_border_rounded,
-        'inactiveIcon': Icons.bookmark_border_rounded
+        'icon': Icons.bookmark_rounded,
+        'inactiveIcon': Icons.bookmark_border_rounded,
       },
     ];
 
@@ -148,14 +143,17 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                         color: isSelected
                             ? const Color(0xFFF4F4F4)
                             : const Color(0xFFBDBDBD),
-                        fontSize: 18,
-                        fontWeight: FontWeight.normal,
-                        fontFamily: 'thmanyah_sans',
+                        fontSize: 16,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontFamily: 'ThmanyahSans',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Icon(
-                      (isSelected ? tab['icon'] : tab['inactiveIcon']) as IconData,
+                      (isSelected ? tab['icon'] : tab['inactiveIcon'])
+                          as IconData,
                       size: 24,
                       color: isSelected
                           ? const Color(0xFFF4F4F4)
@@ -176,8 +174,6 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
       case 0:
         return _buildFavoritesTab(viewModel);
       case 1:
-        return _buildDownloadsTab(viewModel);
-      case 2:
         return _buildHighlightsTab(viewModel);
       default:
         return const SizedBox.shrink();
@@ -189,15 +185,14 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Sub-filter pills (كتب, بودكاست, ريلز)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        // Favorite content filters.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            _buildFilterPill(viewModel, 2, 'ريلز'),
-            const SizedBox(width: 4),
-            _buildFilterPill(viewModel, 1, 'بودكاست'),
-            const SizedBox(width: 4),
             _buildFilterPill(viewModel, 0, 'كتب'),
+            _buildFilterPill(viewModel, 1, 'بودكاست'),
+            _buildFilterPill(viewModel, 2, 'ريلز'),
           ],
         ),
         const SizedBox(height: 16),
@@ -225,10 +220,12 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF1F1F1F) : const Color(0xFFF4F4F4),
+            color: isSelected
+                ? const Color(0xFF1F1F1F)
+                : const Color(0xFFF4F4F4),
             fontSize: 14,
             fontWeight: FontWeight.normal,
-            fontFamily: 'thmanyah_sans',
+            fontFamily: 'ThmanyahSans',
           ),
         ),
       ),
@@ -243,7 +240,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
         return const Center(
           child: Text(
             'لا توجد كتب مفضلة حالياً',
-            style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
+            style: TextStyle(color: Colors.white54, fontFamily: 'ThmanyahSans'),
           ),
         );
       }
@@ -267,7 +264,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
         return const Center(
           child: Text(
             'لا توجد مقاطع ريلز مفضلة حالياً',
-            style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
+            style: TextStyle(color: Colors.white54, fontFamily: 'ThmanyahSans'),
           ),
         );
       }
@@ -334,7 +331,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                               color: Color(0xFFF4F4F4),
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
-                              fontFamily: 'thmanyah_sans',
+                              fontFamily: 'ThmanyahSans',
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -345,7 +342,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                             style: const TextStyle(
                               color: Color(0xFFBDBDBD),
                               fontSize: 14,
-                              fontFamily: 'thmanyah_sans',
+                              fontFamily: 'ThmanyahSans',
                             ),
                           ),
                         ],
@@ -364,7 +361,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                       style: const TextStyle(
                         color: Color(0xFFBDBDBD),
                         fontSize: 14,
-                        fontFamily: 'thmanyah_sans',
+                        fontFamily: 'ThmanyahSans',
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -395,12 +392,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const BookReaderScreen(),
-                        ),
-                      );
+                      Navigator.of(context).pushNamed(_bookReaderRouteName);
                     },
                     icon: SvgPicture.asset(
                       'assets/nav_books.svg',
@@ -417,7 +409,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                         color: Color(0xFF1F1F1F),
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        fontFamily: 'thmanyah_sans',
+                        fontFamily: 'ThmanyahSans',
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -469,7 +461,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                     color: Color(0xFFF4F4F4),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
               ],
@@ -483,7 +475,10 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 padding: EdgeInsets.all(16.0),
                 child: Text(
                   'لا توجد برامج مفضلة حالياً',
-                  style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontFamily: 'ThmanyahSans',
+                  ),
                 ),
               ),
             ),
@@ -496,15 +491,12 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
               crossAxisSpacing: 8,
               childAspectRatio: 175 / 157,
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final show = shows[index];
-                return _buildFigmaPodcastShowCard(show, () {
-                  viewModel.toggleFavoritePodcastShow(show.id);
-                });
-              },
-              childCount: shows.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final show = shows[index];
+              return _buildFigmaPodcastShowCard(show, () {
+                viewModel.toggleFavoritePodcastShow(show.id);
+              });
+            }, childCount: shows.length),
           ),
 
         // 2. Favorite Episodes section (الحلقات المفضلة)
@@ -520,7 +512,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                     color: Color(0xFFF4F4F4),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
               ],
@@ -534,29 +526,32 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 padding: EdgeInsets.all(16.0),
                 child: Text(
                   'لا توجد حلقات مفضلة حالياً',
-                  style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontFamily: 'ThmanyahSans',
+                  ),
                 ),
               ),
             ),
           )
         else
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final episode = episodes[index];
-                return _buildFigmaPodcastEpisodeCard(episode, () {
-                  viewModel.toggleFavoritePodcastEpisode(episode.id);
-                });
-              },
-              childCount: episodes.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final episode = episodes[index];
+              return _buildFigmaPodcastEpisodeCard(episode, () {
+                viewModel.toggleFavoritePodcastEpisode(episode.id);
+              });
+            }, childCount: episodes.length),
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
 
-  Widget _buildFigmaPodcastShowCard(LibraryPodcastShow show, VoidCallback onFavoriteTap) {
+  Widget _buildFigmaPodcastShowCard(
+    LibraryPodcastShow show,
+    VoidCallback onFavoriteTap,
+  ) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -621,7 +616,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                   style: const TextStyle(
                     color: Color(0xFFF4F4F4),
                     fontSize: 14,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
                 Text(
@@ -632,7 +627,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                     color: Color(0xFFF4F4F4),
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
                 Text(
@@ -640,7 +635,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                   style: const TextStyle(
                     color: Color(0xFFBDBDBD),
                     fontSize: 14,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
               ],
@@ -651,7 +646,10 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
     );
   }
 
-  Widget _buildFigmaPodcastEpisodeCard(LibraryPodcastEpisode episode, VoidCallback onFavoriteTap) {
+  Widget _buildFigmaPodcastEpisodeCard(
+    LibraryPodcastEpisode episode,
+    VoidCallback onFavoriteTap,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(8),
@@ -686,7 +684,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                   style: const TextStyle(
                     color: Color(0xFFBDBDBD),
                     fontSize: 12,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -698,14 +696,17 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                     color: Color(0xFFF4F4F4),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    fontFamily: 'thmanyah_sans',
+                    fontFamily: 'ThmanyahSans',
                   ),
                 ),
                 const SizedBox(height: 6),
 
                 // Play / duration button
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFBD10),
                     borderRadius: BorderRadius.circular(26),
@@ -719,7 +720,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                           color: Color(0xFF1F1F1F),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'thmanyah_sans',
+                          fontFamily: 'ThmanyahSans',
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -816,7 +817,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
               style: const TextStyle(
                 color: Color(0xFFBDBDBD),
                 fontSize: 10,
-                fontFamily: 'thmanyah_sans',
+                fontFamily: 'ThmanyahSans',
               ),
             ),
           ),
@@ -834,163 +835,8 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
-                fontFamily: 'thmanyah_sans',
+                fontFamily: 'ThmanyahSans',
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== DOWNLOADS TAB ====================
-  Widget _buildDownloadsTab(AudioLibraryViewModel viewModel) {
-    final downloads = viewModel.downloadedBooks;
-
-    return Column(
-      children: [
-        // Summary bar `chapter`
-        Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF333333)),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '6 كتب محملة',
-                      style: TextStyle(
-                        color: Color(0xFFF4F4F4),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'thmanyah_sans',
-                      ),
-                    ),
-                    Text(
-                      '340 ميجا مستخدمة',
-                      style: TextStyle(
-                        color: Color(0xFFBDBDBD),
-                        fontSize: 12,
-                        fontFamily: 'thmanyah_sans',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Download Icon
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.file_download_outlined,
-                  size: 24,
-                  color: Color(0xFFBDBDBD),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Downloads List
-        Expanded(
-          child: downloads.isEmpty
-              ? const Center(
-                  child: Text(
-                    'لا توجد تنزيلات حالياً',
-                    style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  itemCount: downloads.length,
-                  itemBuilder: (context, index) {
-                    final book = downloads[index];
-                    return _buildFigmaDownloadedBookCard(book, () {
-                      viewModel.deleteDownload(book.id);
-                    });
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFigmaDownloadedBookCard(LibraryBook book, VoidCallback onDeleteTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1F1F1F),
-        border: Border.all(color: const Color(0xFF333333)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Left: Menu book / Delete icon
-          GestureDetector(
-            onTap: onDeleteTap,
-            child: SvgPicture.asset(
-              'assets/nav_books.svg',
-              colorFilter: const ColorFilter.mode(
-                Color(0xFFFFBD10),
-                BlendMode.srcIn,
-              ),
-              width: 24,
-              height: 24,
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Center: Title, Author
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFF4F4F4),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'thmanyah_sans',
-                  ),
-                ),
-                Text(
-                  book.author,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFBDBDBD),
-                    fontSize: 12,
-                    fontFamily: 'thmanyah_sans',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Right: Small cover image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: Image.asset(
-              book.coverUrl,
-              width: 31,
-              height: 42,
-              fit: BoxFit.cover,
             ),
           ),
         ],
@@ -1006,7 +852,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
       return const Center(
         child: Text(
           'لا توجد إشارات أو اقتباسات حالياً',
-          style: TextStyle(color: Colors.white54, fontFamily: 'thmanyah_sans'),
+          style: TextStyle(color: Colors.white54, fontFamily: 'ThmanyahSans'),
         ),
       );
     }
@@ -1023,7 +869,10 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
     );
   }
 
-  Widget _buildFigmaHighlightCard(LibraryHighlight hl, VoidCallback onDeleteTap) {
+  Widget _buildFigmaHighlightCard(
+    LibraryHighlight hl,
+    VoidCallback onDeleteTap,
+  ) {
     final themeColor = Color(hl.colorHex);
 
     return Container(
@@ -1073,7 +922,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                               color: Color(0xFFF4F4F4),
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              fontFamily: 'thmanyah_sans',
+                              fontFamily: 'ThmanyahSans',
                             ),
                           ),
                           Text(
@@ -1083,7 +932,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                             style: const TextStyle(
                               color: Color(0xFFBDBDBD),
                               fontSize: 12,
-                              fontFamily: 'thmanyah_sans',
+                              fontFamily: 'ThmanyahSans',
                             ),
                           ),
                         ],
@@ -1117,12 +966,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 topRight: Radius.circular(0),
                 bottomRight: Radius.circular(0),
               ),
-              border: Border(
-                right: BorderSide(
-                  color: themeColor,
-                  width: 4,
-                ),
-              ),
+              border: Border(right: BorderSide(color: themeColor, width: 4)),
             ),
             child: Row(
               children: [
@@ -1133,7 +977,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                       color: Color(0xFFF4F4F4),
                       fontSize: 12,
                       height: 1.5,
-                      fontFamily: 'thmanyah_sans',
+                      fontFamily: 'ThmanyahSans',
                     ),
                   ),
                 ),
@@ -1151,9 +995,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 onTap: () {
                   // Mock Share
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('تم نسخ الاقتباس للمشاركة!'),
-                    ),
+                    const SnackBar(content: Text('تم نسخ الاقتباس للمشاركة!')),
                   );
                 },
                 child: SvgPicture.asset(
@@ -1173,7 +1015,7 @@ class _AudioLibraryContentState extends State<_AudioLibraryContent> {
                 style: const TextStyle(
                   color: Color(0xFF9E9E9E),
                   fontSize: 12,
-                  fontFamily: 'thmanyah_sans',
+                  fontFamily: 'ThmanyahSans',
                 ),
               ),
             ],

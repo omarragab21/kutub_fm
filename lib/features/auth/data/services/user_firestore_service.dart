@@ -24,18 +24,18 @@ class UserFirestoreService {
         'uid': uid,
         'name': name,
         'email': email,
-        if (photoUrl != null) 'photoUrl': photoUrl,
+        'photoUrl': ?photoUrl,
         'provider': provider,
         'role': 'user',
         'isGuest': false,
         'emailVerified': emailVerified,
         'userType': userType,
-        if (emailDomain != null) 'emailDomain': emailDomain,
+        'emailDomain': ?emailDomain,
         'appEmailVerified': appEmailVerified,
         'firebaseEmailVerified': firebaseEmailVerified,
         'verificationMode': verificationMode,
         'updatedAt': FieldValue.serverTimestamp(),
-        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+        'phoneNumber': ?phoneNumber,
       };
 
       // We use SetOptions(merge: true) to avoid overwriting existing fields

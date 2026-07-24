@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../../domain/entities/reel_model.dart';
 
@@ -13,8 +17,12 @@ class ReelsViewModel extends ChangeNotifier {
   bool _isLoading = false;
   StreamSubscription<QuerySnapshot>? _reelsSubscription;
   bool _isPageActive = false;
+  bool _isUploading = false;
+  String? _uploadError;
 
   bool get isPageActive => _isPageActive;
+  bool get isUploading => _isUploading;
+  String? get uploadError => _uploadError;
 
   void setPageActive(bool active) {
     if (_isPageActive == active) return;
@@ -62,51 +70,61 @@ class ReelsViewModel extends ChangeNotifier {
     _currentIndex = 0;
     notifyListeners();
 
-    // Dispose all existing controllers when list refreshes
     _disposeAllControllers();
-
     await _reelsSubscription?.cancel();
 
     try {
-      Query query =
-          _firestore.collection('reels').orderBy('createdAt', descending: true);
-
-      if (_category != null && _category!.isNotEmpty) {
-        query = query.where('categoryName', isEqualTo: _category);
-      }
+      final query = _firestore.collection('reels').orderBy('createdAt', descending: true);
 
       _reelsSubscription = query.snapshots().listen((querySnapshot) {
+        List<Reel> fetched = [];
         if (querySnapshot.docs.isNotEmpty) {
-          _reels = querySnapshot.docs.map((doc) {
+          fetched = querySnapshot.docs.map((doc) {
             return Reel.fromFirestore(
-                doc.id, doc.data() as Map<String, dynamic>);
+              doc.id,
+              doc.data(),
+            );
           }).toList();
-
-          if (initialReelId != null) {
-            final index = _reels.indexWhere((r) => r.id == initialReelId);
-            if (index != -1) {
-              _currentIndex = index;
-            }
-          }
         } else {
-          _reels = [];
+          fetched = Reel.defaultReelsList;
+        }
+
+        if (_category != null && _category!.isNotEmpty) {
+          fetched = fetched
+              .where(
+                (r) =>
+                    r.categoryName.isEmpty ||
+                    r.categoryName == _category ||
+                    _category == 'الكل',
+              )
+              .toList();
+        }
+
+        _reels = fetched.isNotEmpty ? fetched : Reel.defaultReelsList;
+
+        if (initialReelId != null) {
+          final index = _reels.indexWhere((r) => r.id == initialReelId);
+          if (index != -1) {
+            _currentIndex = index;
+          }
         }
         _isLoading = false;
         notifyListeners();
 
-        // Warm up the first two reels after the list arrives
         _warmUpWindow(_currentIndex);
       }, onError: (e) {
         debugPrint('Error loading reels stream: $e');
-        _reels = [];
+        _reels = Reel.defaultReelsList;
         _isLoading = false;
         notifyListeners();
+        _warmUpWindow(_currentIndex);
       });
     } catch (e) {
       debugPrint('Error establishing reels stream: $e');
-      _reels = [];
+      _reels = Reel.defaultReelsList;
       _isLoading = false;
       notifyListeners();
+      _warmUpWindow(_currentIndex);
     }
   }
 
@@ -198,6 +216,81 @@ class ReelsViewModel extends ChangeNotifier {
     _disposeAllControllers();
     _pageController?.dispose();
     super.dispose();
+  }
+
+  // ─── Reel upload ──────────────────────────────────────────────────────────
+
+  Future<String?> pickAndUploadVideo(ImageSource source) async {
+    if (_isUploading) return 'جاري رفع فيديو آخر حالياً';
+    _isUploading = true;
+    _uploadError = null;
+    notifyListeners();
+
+    String? result;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 20),
+      );
+
+      if (picked == null) {
+        _isUploading = false;
+        notifyListeners();
+        return null;
+      }
+
+      final file = File(picked.path);
+      final controller = VideoPlayerController.file(file);
+      try {
+        await controller.initialize();
+        final duration = controller.value.duration;
+        if (duration > const Duration(seconds: 20)) {
+          result = 'مدة الفيديو تتجاوز 20 ثانية. الرجاء اختيار مقطع أقصر.';
+          _isUploading = false;
+          notifyListeners();
+          return result;
+        }
+      } catch (e) {
+        result = 'تعذر قراءة معلومات الفيديو.';
+        _isUploading = false;
+        notifyListeners();
+        return result;
+      } finally {
+        await controller.dispose();
+      }
+
+      final fileName = picked.path.split('/').last;
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('user_reels/${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      final uploadTask = await storageRef.putFile(file);
+      final videoUrl = await uploadTask.ref.getDownloadURL();
+
+      final user = FirebaseAuth.instance.currentUser;
+      await _firestore.collection('reels').add({
+        'videoUrl': videoUrl,
+        'imageUrl': '',
+        'bookTitle': 'فيديو من المستخدم',
+        'author': user?.displayName ?? user?.email ?? 'مستخدم كتب FM',
+        'quote': '',
+        'likes': 0,
+        'comments': 0,
+        'shares': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+        if (user != null) 'createdBy': user.uid,
+      });
+
+      result = null;
+    } catch (e) {
+      debugPrint('Error uploading reel: $e');
+      result = 'حدث خطأ أثناء رفع الفيديو: $e';
+    } finally {
+      _isUploading = false;
+      _uploadError = result;
+      notifyListeners();
+    }
+    return result;
   }
 
   // ─── Unused stubs ─────────────────────────────────────────────────────────

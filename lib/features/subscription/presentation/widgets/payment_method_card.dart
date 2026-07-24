@@ -7,11 +7,11 @@ class PaymentMethodCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const PaymentMethodCard({
-    Key? key,
+    super.key,
     required this.method,
     required this.isSelected,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   String get title {
     switch (method) {
@@ -113,7 +113,7 @@ class PaymentMethodCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFD4AF37).withOpacity(0.1)
+              ? const Color(0xFFD4AF37).withValues(alpha: 0.1)
               : const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(

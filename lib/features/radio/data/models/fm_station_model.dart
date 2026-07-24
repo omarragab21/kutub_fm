@@ -2,6 +2,92 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/fm_station.dart';
 
+class RadioAudioModel extends RadioAudio {
+  const RadioAudioModel({
+    required super.id,
+    required super.title,
+    required super.url,
+    super.subtitle,
+  });
+
+  factory RadioAudioModel.fromMap(
+    Map<String, dynamic> data, {
+    required String fallbackId,
+  }) {
+    return RadioAudioModel(
+      id: FmStationModel._readString(data, [
+        'id',
+        'audioId',
+        'audio_id',
+      ]).ifEmpty(fallbackId),
+      title: FmStationModel._readString(data, [
+        'title',
+        'name',
+        'audioTitle',
+        'audio_title',
+      ]).ifEmpty('حلقة إذاعية'),
+      url: FmStationModel._readString(data, [
+        'url',
+        'audioUrl',
+        'audio_url',
+        'streamUrl',
+        'stream_url',
+      ]),
+      subtitle: FmStationModel._readString(data, [
+        'subtitle',
+        'description',
+        'time',
+        'date',
+        'publishedAt',
+      ]),
+    );
+  }
+}
+
+class RadioProgramModel extends RadioProgram {
+  const RadioProgramModel({
+    required super.id,
+    required super.title,
+    super.audios,
+  });
+
+  factory RadioProgramModel.fromMap(
+    Map<String, dynamic> data, {
+    required String fallbackId,
+  }) {
+    final rawAudios = data['audios'] ?? data['episodes'] ?? data['items'];
+    final parsedAudios = <RadioAudio>[];
+    if (rawAudios is List) {
+      for (var i = 0; i < rawAudios.length; i++) {
+        final item = rawAudios[i];
+        if (item is Map) {
+          parsedAudios.add(
+            RadioAudioModel.fromMap(
+              Map<String, dynamic>.from(item),
+              fallbackId: '${fallbackId}_audio_$i',
+            ),
+          );
+        }
+      }
+    }
+
+    return RadioProgramModel(
+      id: FmStationModel._readString(data, [
+        'id',
+        'programId',
+        'program_id',
+      ]).ifEmpty(fallbackId),
+      title: FmStationModel._readString(data, [
+        'title',
+        'name',
+        'programTitle',
+        'program_title',
+      ]).ifEmpty('برنامج إذاعي'),
+      audios: List.unmodifiable(parsedAudios),
+    );
+  }
+}
+
 class FmStationModel extends FmStation {
   const FmStationModel({
     required super.id,
@@ -12,6 +98,7 @@ class FmStationModel extends FmStation {
     super.frequencyMhz,
     super.listenersApprox,
     super.accentColorArgb,
+    super.programs,
     this.isActive = true,
     this.isQuranStation = false,
     this.sortOrder = 0,
@@ -34,6 +121,22 @@ class FmStationModel extends FmStation {
     Map<String, dynamic> data, {
     required String fallbackId,
   }) {
+    final rawPrograms = data['programs'] ?? data['programs_list'];
+    final parsedPrograms = <RadioProgram>[];
+    if (rawPrograms is List) {
+      for (var i = 0; i < rawPrograms.length; i++) {
+        final item = rawPrograms[i];
+        if (item is Map) {
+          parsedPrograms.add(
+            RadioProgramModel.fromMap(
+              Map<String, dynamic>.from(item),
+              fallbackId: 'program_$i',
+            ),
+          );
+        }
+      }
+    }
+
     return FmStationModel(
       id: _readString(data, [
         'id',
@@ -93,6 +196,7 @@ class FmStationModel extends FmStation {
         'votes',
       ]),
       accentColorArgb: _readColor(data) ?? 0xFFF2CA50,
+      programs: List.unmodifiable(parsedPrograms),
       isActive:
           _readBool(data, ['isActive', 'is_active', 'active', 'enabled']) ??
           true,
@@ -115,6 +219,7 @@ class FmStationModel extends FmStation {
           0,
     );
   }
+
 
   bool get hasPlayableStream => streamUrl.trim().isNotEmpty;
 

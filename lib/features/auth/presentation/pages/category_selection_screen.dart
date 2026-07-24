@@ -344,7 +344,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                             child: Container(
                               height: 3,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(1.5),
                               ),
                             ),
@@ -400,7 +400,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                         Text(
                           'أخبرنا بما يلفت انتباهك، ودعنا نأخذك إلى كتب وحكايات وأصوات صنعت لتلامس شغفك.',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 16,
                             height: 1.5,
                           ),
@@ -464,13 +464,13 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                             children: [
                               Icon(
                                 Icons.chevron_left,
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 size: 18,
                               ),
                               Text(
                                 'عودة للخلف',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -506,7 +506,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -537,7 +537,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Text(
@@ -559,7 +559,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   Widget _buildInterestChip(CategoryItem category) {
     final isSelected = _selectedCategoryIds.contains(category.id);
     const primaryGold = Color(0xFFFFC00E);
-    final color = isSelected ? primaryGold : Colors.white;
 
     return GestureDetector(
       onTap: () => _toggleCategory(category.id),

@@ -113,5 +113,7 @@
 	<string>يتطلب هذا التطبيق إذنًا لحفظ مقاطع الريلز التي تم إنشاؤها إلى معرض الصور الخاص بك.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>يتطلب هذا التطبيق إذنًا للوصول إلى معرض الصور الخاص بك لحفظ مقاطع الريلز.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>يتطلب هذا التطبيق إذنًا للكاميرا لتصوير مقاطع الريلز.</string>
 </dict>
 </plist>

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AuthBackground extends StatelessWidget {
@@ -37,8 +36,8 @@ class AuthBackground extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.0),
-                            Colors.black.withOpacity(0.85),
+                            Colors.black.withValues(alpha: 0.0),
+                            Colors.black.withValues(alpha: 0.85),
                             Colors.black,
                           ],
                           stops: const [0.0, 0.35, 0.8, 1.0],

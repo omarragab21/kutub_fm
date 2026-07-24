@@ -36,6 +36,15 @@ class BookDetailsRepositoryImpl implements BookDetailsRepository {
     resolvedData['imageUrl'] = await FirebaseStorageUrlResolver.resolve(
       _readString(data, const ['imageUrl', 'coverUrl', 'cover_url']),
     );
+    resolvedData['pdfUrl'] = await FirebaseStorageUrlResolver.resolve(
+      _readString(data, const [
+        'pdfUrl',
+        'pdfURL',
+        'pdf_url',
+        'pdfDownloadUrl',
+        'pdf_download_url',
+      ]),
+    );
 
     return BookDetail.fromFirestore(resolvedData, bookDoc.id, chapters);
   }

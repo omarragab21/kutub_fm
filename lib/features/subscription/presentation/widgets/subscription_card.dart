@@ -7,13 +7,13 @@ class SubscriptionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const SubscriptionCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.description,
     required this.price,
     required this.isSelected,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,7 @@ class SubscriptionCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFD4AF37).withOpacity(0.1) : const Color(0xFF1E1E1E),
+          color: isSelected ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? const Color(0xFFD4AF37) : Colors.transparent,
@@ -34,7 +34,7 @@ class SubscriptionCard extends StatelessWidget {
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: const Color(0xFFD4AF37).withOpacity(0.2),
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -5,55 +9,117 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class PostDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> post;
 
-  const PostDetailsScreen({Key? key, required this.post}) : super(key: key);
+  const PostDetailsScreen({super.key, required this.post});
 
   @override
   State<PostDetailsScreen> createState() => _PostDetailsScreenState();
 }
 
 class _PostDetailsScreenState extends State<PostDetailsScreen> {
-  final List<Map<String, dynamic>> _comments = [
-    {
-      'name': 'سامر العلي',
-      'date': '24/5/2026',
-      'avatar': 'assets/community/imgAvatar.png',
-      'likes': 3,
-      'content':
-          'أتفق معك تمامًا! الرواية من أروع ما قرأت في حياتي. ماركيز عبقري بكل معنى الكلمة.',
-    },
-    {
-      'name': 'ليلى حسن',
-      'date': '15/7/2026',
-      'avatar': 'assets/community/imgAvatar1.png',
-      'likes': 4,
-      'content':
-          'قصة رائعة تحمل بين طياتها الكثير من المشاعر والأفكار العميقة. أحببت كل شخصية فيها.',
-    },
-    {
-      'name': 'خالد يوسف',
-      'date': '2/9/2026',
-      'avatar': 'assets/community/imgAvatar2.png',
-      'likes': 5,
-      'content':
-          'الأسلوب السلس والوصف الدقيق جعلاني أعيش الأحداث وكأنني جزء منها. أنصح الجميع بقراءتها.',
-    },
-    {
-      'name': 'منى عبد الله',
-      'date': '18/10/2026',
-      'avatar': 'assets/community/imgAvatar3.png',
-      'likes': 6,
-      'content':
-          'لم أتوقع أن تجمع الرواية بين التشويق والفلسفة بهذا الشكل. تجربة قراءة لا تُنسى.',
-    },
-    {
-      'name': 'عمر محمد',
-      'date': '30/11/2026',
-      'avatar': 'assets/community/imgAvatar4.png',
-      'likes': 7,
-      'content':
-          'الرموز والرسائل العميقة في الرواية فتحت لي آفاقًا جديدة للفهم والتأمل. عمل مبدع بحق.',
-    },
-  ];
+  final List<Map<String, dynamic>> _comments = [];
+  final TextEditingController _commentController = TextEditingController();
+  StreamSubscription<DocumentSnapshot>? _postSubscription;
+  bool _isLoadingComments = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  void _loadComments() {
+    final postId = widget.post['id'] as String?;
+    if (postId == null || postId.isEmpty) {
+      setState(() => _isLoadingComments = false);
+      return;
+    }
+
+    _postSubscription = FirebaseFirestore.instance
+        .collection('community_posts')
+        .doc(postId)
+        .snapshots()
+        .listen((doc) {
+      if (!doc.exists) {
+        setState(() => _isLoadingComments = false);
+        return;
+      }
+
+      final data = doc.data()!;
+      final commentsList = List<Map<String, dynamic>>.from(
+        (data['comments'] as List?)?.map((c) {
+          final comment = Map<String, dynamic>.from(c as Map);
+          final createdAt = comment['createdAt'] is Timestamp
+              ? (comment['createdAt'] as Timestamp).toDate()
+              : DateTime.now();
+          return {
+            ...comment,
+            'date': _formatDate(createdAt),
+          };
+        }) ?? [],
+      );
+
+      setState(() {
+        _comments.clear();
+        _comments.addAll(commentsList);
+        _isLoadingComments = false;
+      });
+    }, onError: (e) {
+      debugPrint('Error loading comments: $e');
+      setState(() => _isLoadingComments = false);
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final postId = widget.post['id'] as String?;
+    if (postId == null || postId.isEmpty) return;
+
+    _commentController.clear();
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      final userName = userDoc.data()?['name'] as String? ?? 'مستخدم كتب FM';
+      final userAvatar =
+          userDoc.data()?['avatar'] as String? ?? 'assets/community/imgAvatar.png';
+
+      final newComment = {
+        'userName': userName,
+        'userAvatarUrl': userAvatar,
+        'content': text,
+        'createdAt': FieldValue.serverTimestamp(),
+        'likedBy': <String>[],
+      };
+
+      await FirebaseFirestore.instance
+          .collection('community_posts')
+          .doc(postId)
+          .update({
+        'comments': FieldValue.arrayUnion([newComment]),
+      });
+    } catch (e) {
+      debugPrint('Error submitting comment: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _postSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,9 +150,31 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ..._comments
-                        .map((comment) => _buildCommentItem(comment))
-                        .toList(),
+                    if (_isLoadingComments)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFFBD10),
+                          ),
+                        ),
+                      )
+                    else if (_comments.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text(
+                            'لا توجد تعليقات بعد',
+                            style: TextStyle(
+                              fontFamily: 'ThmanyahSans',
+                              color: const Color(0xFFBDBDBD),
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._comments.map((comment) => _buildCommentItem(comment)),
                   ],
                 ),
               ),
@@ -372,12 +460,7 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(27),
-                child: Image.asset(
-                  comment['avatar'],
-                  width: 54,
-                  height: 54,
-                  fit: BoxFit.cover,
-                ),
+                child: _buildAvatar(comment['userAvatarUrl'] ?? comment['avatar']),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -385,7 +468,7 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      comment['name'],
+                      comment['userName'] ?? comment['name'],
                       style: TextStyle(
                         fontFamily: 'ThmanyahSans',
                         color: const Color(0xFFF4F4F4),
@@ -407,8 +490,8 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
                 ),
               ),
               _buildActionIcon(
-                'assets/community/imgVector13.svg', // Heart icon
-                '${comment['likes']}',
+                'assets/community/imgVector13.svg',
+                '${(comment['likedBy'] as List?)?.length ?? comment['likes'] ?? 0}',
               ),
             ],
           ),
@@ -426,6 +509,24 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String? avatarUrl) {
+    final fallback = 'assets/community/imgAvatar.png';
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return Image.asset(fallback, width: 54, height: 54, fit: BoxFit.cover);
+    }
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+      return Image.network(
+        avatarUrl,
+        width: 54,
+        height: 54,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Image.asset(fallback, width: 54, height: 54, fit: BoxFit.cover),
+      );
+    }
+    return Image.asset(avatarUrl, width: 54, height: 54, fit: BoxFit.cover);
   }
 
   Widget _buildActionIcon(String iconPath, String count) {
@@ -467,21 +568,24 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFBD10),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: SvgPicture.asset(
-                'assets/post_details/imgVector14.svg',
-                width: 20,
-                height: 20,
-                colorFilter: const ColorFilter.mode(
-                  Color(0xFF1F1F1F),
-                  BlendMode.srcIn,
+          GestureDetector(
+            onTap: _submitComment,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFBD10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/post_details/imgVector14.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: const ColorFilter.mode(
+                    Color(0xFF1F1F1F),
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
             ),
@@ -497,6 +601,7 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
               ),
               alignment: Alignment.centerRight,
               child: TextField(
+                controller: _commentController,
                 style: const TextStyle(
                   fontFamily: 'ThmanyahSans',
                   color: Colors.white,
@@ -511,6 +616,7 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
                   ),
                   border: InputBorder.none,
                 ),
+                onSubmitted: (_) => _submitComment(),
               ),
             ),
           ),

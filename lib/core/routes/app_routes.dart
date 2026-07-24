@@ -30,6 +30,9 @@ import '../../features/home/presentation/pages/best_this_month_screen.dart';
 import '../../features/home/presentation/pages/special_collections_screen.dart';
 import '../../features/home/presentation/pages/collection_details_screen.dart';
 import '../../features/community/presentation/pages/post_details_screen.dart';
+import '../../features/community/presentation/pages/create_community_post_screen.dart';
+import '../../features/community/presentation/pages/community_search_screen.dart';
+import '../../features/home/presentation/pages/continue_reading_screen.dart';
 
 import 'package:provider/provider.dart';
 import '../../features/profile/presentation/pages/settings_screen.dart';
@@ -69,6 +72,9 @@ class AppRoutes {
   static const String specialCollections = '/special_collections';
   static const String collectionDetails = '/collection_details';
   static const String postDetails = '/post_details';
+  static const String communityCreatePost = '/community_create_post';
+  static const String communitySearch = '/community_search';
+  static const String continueReading = '/continue_reading';
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -280,9 +286,10 @@ class AppRoutes {
           builder: (_) => const BookWorldScreen(),
         );
       case bestThisMonth:
+        final isMostSelling = routeSettings.arguments as bool? ?? false;
         return MaterialPageRoute(
           settings: routeSettings,
-          builder: (_) => const BestThisMonthScreen(),
+          builder: (_) => BestThisMonthScreen(isMostSelling: isMostSelling),
         );
       case specialCollections:
         return MaterialPageRoute(
@@ -294,7 +301,7 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => CollectionDetailsScreen(
-            args: args ?? CollectionDetailsArgs(title: 'عالم الكتب'),
+            args: args ?? CollectionDetailsArgs(id: '', title: 'عالم الكتب'),
           ),
         );
       case postDetails:
@@ -302,6 +309,22 @@ class AppRoutes {
         return MaterialPageRoute(
           settings: routeSettings,
           builder: (_) => PostDetailsScreen(post: post),
+        );
+      case communityCreatePost:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const CreateCommunityPostScreen(),
+          fullscreenDialog: true,
+        );
+      case communitySearch:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const CommunitySearchScreen(),
+        );
+      case continueReading:
+        return MaterialPageRoute(
+          settings: routeSettings,
+          builder: (_) => const ContinueReadingScreen(),
         );
       default:
         return MaterialPageRoute(

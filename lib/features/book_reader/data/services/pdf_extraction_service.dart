@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../domain/entities/reader_sentence.dart';
 
+/// Extracts plain text from PDFs, either from a bundled asset or by reading a
+/// PDF online from a URL. The downloaded bytes live only in memory and are
+/// discarded after extraction — the PDF file is never written to disk.
 class PdfExtractionService {
   final _arabicRegex = RegExp(r'[\u0600-\u06FF]');
 
@@ -20,15 +24,51 @@ class PdfExtractionService {
     }
   }
 
+  /// Reads a PDF online from [url] and extracts text for the given page range.
+  /// [startPage] and [endPage] are 1-based inclusive; when null the whole
+  /// document is extracted. The bytes are held in memory only (not saved).
+  Future<String> extractTextFromUrl(
+    String url, {
+    int? startPage,
+    int? endPage,
+  }) async {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode != 200) {
+      throw Exception('تعذّر تحميل ملف الكتاب (${response.statusCode})');
+    }
+    return _extractFromBytes(
+      response.bodyBytes,
+      startPage: startPage,
+      endPage: endPage,
+    );
+  }
+
   /// Synchronously process raw bytes with Syncfusion.
   /// Some PDFs (scanned/image-based) return empty text — we detect that and
   /// fall back to the mock content so the reader still works.
-  String _extractFromBytes(List<int> bytes) {
+  ///
+  /// [startPage] and [endPage] are 1-based inclusive page numbers used to
+  /// restrict extraction to a specific chapter range.
+  String _extractFromBytes(
+    List<int> bytes, {
+    int? startPage,
+    int? endPage,
+  }) {
     PdfDocument document = PdfDocument(inputBytes: bytes);
     PdfTextExtractor extractor = PdfTextExtractor(document);
+    final int pageCount = document.pages.count;
+
+    // Convert 1-based page numbers to 0-based indices and clamp to bounds.
+    int start = (startPage != null && startPage > 0) ? startPage - 1 : 0;
+    int end = (endPage != null && endPage > 0) ? endPage - 1 : pageCount - 1;
+    if (start > pageCount - 1) start = pageCount - 1;
+    if (start < 0) start = 0;
+    if (end > pageCount - 1) end = pageCount - 1;
+    if (end < start) end = start;
+
     // Extract page-by-page and join, which is more reliable than extractText()
     final buffer = StringBuffer();
-    for (int i = 0; i < document.pages.count; i++) {
+    for (int i = start; i <= end; i++) {
       final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
       if (pageText.isNotEmpty) {
         buffer.writeln(pageText);

@@ -13,6 +13,7 @@ import '../../features/podcast/domain/entities/podcast_episode.dart';
 import '../../features/book_details/domain/entities/book_detail_model.dart';
 import 'audio_models.dart';
 import 'audio_service.dart';
+import '../stats/user_stats_tracker.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -281,14 +282,14 @@ class AudioProvider extends ChangeNotifier {
     bool autoplay = true,
     Duration initialPosition = Duration.zero,
   }) async {
-    if (!chapter.isReadableAudio) {
-      debugPrint('Chapter ${chapter.id} is missing transcript or audio URL.');
+    if (!chapter.hasAudioUrl) {
+      debugPrint('Chapter ${chapter.id} is missing audio URL.');
       notifyListeners();
       return;
     }
 
     final availableChapters = chapters
-        .where((ch) => ch.isReadableAudio)
+        .where((ch) => ch.hasAudioUrl)
         .toList(growable: false);
     if (availableChapters.isEmpty) {
       debugPrint('No playable chapters available for book $bookId.');
@@ -339,23 +340,8 @@ class AudioProvider extends ChangeNotifier {
       return;
     }
 
-    // Extract audio source — prefer YouTube URL extraction, fall back to audioUrl
+    // Use chapter audioUrl directly
     String source = chapter.audioUrl;
-    if (chapter.hasYoutubeUrl) {
-      final yt = yt_explode.YoutubeExplode();
-      try {
-        final videoId = YoutubePlayer.convertUrlToId(chapter.youtubeUrl!);
-        if (videoId != null) {
-          final manifest = await yt.videos.streamsClient.getManifest(videoId);
-          final streamInfo = manifest.audioOnly.withHighestBitrate();
-          source = streamInfo.url.toString();
-        }
-      } catch (e) {
-        debugPrint('Error extracting YouTube audio for chapter ${chapter.id}: $e');
-      } finally {
-        yt.close();
-      }
-    }
 
     try {
       await _audioService.loadTrack(
@@ -410,6 +396,39 @@ class AudioProvider extends ChangeNotifier {
 
     notifyListeners();
   }
+
+  Future<void> playRadioAudioEpisode({
+    required FmStation station,
+    required RadioProgram program,
+    required RadioAudio audio,
+  }) async {
+    _clearReadingContext();
+    _currentStation = station;
+    _currentBookId = null;
+
+    try {
+      await _audioService.loadTrack(
+        AudioTrack(
+          id: audio.id,
+          mode: AudioMode.fmRadio,
+          inputType: AudioInputType.uri,
+          source: audio.url,
+          title: audio.title,
+          artist: program.title,
+          album: station.name,
+          artUri: station.coverImageUrl,
+          isLive: false,
+        ),
+        autoplay: true,
+        speed: 1.0,
+      );
+    } catch (_) {
+      // Error handled by AudioService
+    }
+
+    notifyListeners();
+  }
+
 
   Future<void> playPodcast(PodcastEpisode episode) async {
     _clearReadingContext();
@@ -579,6 +598,7 @@ class AudioProvider extends ChangeNotifier {
 
   void _handleServiceStateChanged() {
     _updateListeningTimer();
+    UserStatsTracker.instance.onAudioPlaybackStateChanged(isPlaying: isPlaying);
     notifyListeners();
   }
 
@@ -588,8 +608,7 @@ class AudioProvider extends ChangeNotifier {
     final isTimerActive = isPlaying && isUserLoggedIn && _currentBookId != null;
 
     if (isTimerActive) {
-      if (_listeningTimer == null) {
-        _listeningTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _listeningTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
           final currentUser = FirebaseAuth.instance.currentUser;
           if (currentUser == null || currentUser.isAnonymous) {
             timer.cancel();
@@ -602,7 +621,6 @@ class AudioProvider extends ChangeNotifier {
             _incrementListeningMinutes();
           }
         });
-      }
     } else {
       _listeningTimer?.cancel();
       _listeningTimer = null;

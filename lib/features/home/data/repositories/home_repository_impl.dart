@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/storage/firebase_storage_url_resolver.dart';
 import '../../domain/entities/book_entity.dart';
 import '../../domain/entities/category_entity.dart';
+import '../../domain/entities/book_collection_entity.dart';
 import '../../domain/repositories/home_repository.dart';
 
 class HomeRepositoryImpl implements HomeRepository {
@@ -70,6 +71,24 @@ class HomeRepositoryImpl implements HomeRepository {
     }
   }
 
+  @override
+  Future<List<BookCollectionEntity>> getBookCollections() async {
+    try {
+      final snapshot = await _firestore.collection('book_collections').get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return BookCollectionEntity(
+          id: doc.id,
+          title: data['title'] as String? ?? '',
+          miniDescription: data['miniDescription'] as String? ?? data['subtitle'] as String? ?? '',
+          bookIds: _stringList(data['bookIds']),
+        );
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<BookEntity> _bookEntityFromSnapshot(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) async {
@@ -87,6 +106,8 @@ class HomeRepositoryImpl implements HomeRepository {
       rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
       duration: _formatDuration(data['duration'] as String? ?? ''),
       categoryIds: _stringList(data['categoryIds']),
+      isBestOfMonth: data['isBestOfMonth'] as bool? ?? false,
+      isBestseller: data['isBestseller'] as bool? ?? false,
     );
   }
 

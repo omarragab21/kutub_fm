@@ -6,10 +6,10 @@ class WalletProviderSelector extends StatelessWidget {
   final Function(WalletProviderType) onSelect;
 
   const WalletProviderSelector({
-    Key? key,
+    super.key,
     required this.selectedProvider,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +50,7 @@ class WalletProviderSelector extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : const Color(0xFF1E1E1E),
+          color: isSelected ? color.withValues(alpha: 0.2) : const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : Colors.transparent,

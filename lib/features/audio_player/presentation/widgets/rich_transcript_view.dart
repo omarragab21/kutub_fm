@@ -41,8 +41,8 @@ class RichTranscriptView extends StatelessWidget {
     
     // Base style configuration
     TextStyle style = _getStyleForType(segment.type).copyWith(
-      color: isActive ? AppTheme.primary : AppTheme.onSurfaceVariant.withOpacity(0.6),
-      backgroundColor: isActive ? AppTheme.primary.withOpacity(0.15) : null,
+      color: isActive ? AppTheme.primary : AppTheme.onSurfaceVariant.withValues(alpha: 0.6),
+      backgroundColor: isActive ? AppTheme.primary.withValues(alpha: 0.15) : null,
       height: 1.6,
     );
 
@@ -64,7 +64,7 @@ class RichTranscriptView extends StatelessWidget {
         onTap: () => onSegmentTap?.call(segment.start),
         child: Text.rich(
           TextSpan(
-            text: segment.text + ' ',
+            text: '${segment.text} ',
             style: style,
           ),
           textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,

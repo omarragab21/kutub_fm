@@ -8,13 +8,13 @@ class CreditCardPreview extends StatelessWidget {
   final bool showBack;
 
   const CreditCardPreview({
-    Key? key,
+    super.key,
     required this.cardNumber,
     required this.cardHolder,
     required this.expiryDate,
     required this.cvv,
     this.showBack = false,
-  }) : super(key: key);
+  });
 
   String get _formattedNumber {
     if (cardNumber.isEmpty) return '**** **** **** ****';
@@ -63,12 +63,12 @@ class CreditCardPreview extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5)),
+        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -163,12 +163,12 @@ class CreditCardPreview extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5)),
+        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

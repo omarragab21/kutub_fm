@@ -60,10 +60,12 @@ class ReelApiService {
     required String start,
     required String end,
   }) async {
-    if (audioUrl.isEmpty)
+    if (audioUrl.isEmpty) {
       throw Exception('رابط الملف الصوتي مطلوب لإنشاء الريل.');
-    if (coverUrl.isEmpty)
+    }
+    if (coverUrl.isEmpty) {
       throw Exception('رابط غلاف الكتاب مطلوب لإنشاء الريل.');
+    }
 
     final baseUrl = await getBaseUrl();
     final logoUrl = await getLogoUrl();

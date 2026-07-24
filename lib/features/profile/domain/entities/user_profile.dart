@@ -1,3 +1,5 @@
+import 'user_activity.dart';
+
 /// Domain entity representing a user's profile.
 class UserProfile {
   final String id;
@@ -14,6 +16,7 @@ class UserProfile {
   final List<ContinueListeningItem> continueListening;
   final List<int> weeklyActivityMinutes; // 7 values, Mon-Sun
   final List<UserAchievement> achievements;
+  final List<UserActivityGroup> activityGroups;
 
   const UserProfile({
     required this.id,
@@ -30,6 +33,7 @@ class UserProfile {
     this.continueListening = const [],
     this.weeklyActivityMinutes = const [0, 0, 0, 0, 0, 0, 0],
     this.achievements = const [],
+    this.activityGroups = const [],
   });
 
   String get totalListeningHours {
@@ -51,6 +55,7 @@ class UserProfile {
     List<ContinueListeningItem>? continueListening,
     List<int>? weeklyActivityMinutes,
     List<UserAchievement>? achievements,
+    List<UserActivityGroup>? activityGroups,
   }) {
     return UserProfile(
       id: id,
@@ -67,6 +72,7 @@ class UserProfile {
       continueListening: continueListening ?? this.continueListening,
       weeklyActivityMinutes: weeklyActivityMinutes ?? this.weeklyActivityMinutes,
       achievements: achievements ?? this.achievements,
+      activityGroups: activityGroups ?? this.activityGroups,
     );
   }
 }

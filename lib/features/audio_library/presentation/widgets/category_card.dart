@@ -29,8 +29,8 @@ class CategoryCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 8), // For shadow breathing room
         decoration: BoxDecoration(
           color: isSelected 
-              ? AppTheme.primary.withOpacity(0.15) 
-              : AppTheme.surfaceContainerHighest.withOpacity(0.3),
+              ? AppTheme.primary.withValues(alpha: 0.15) 
+              : AppTheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AppTheme.primary : Colors.transparent,
@@ -39,7 +39,7 @@ class CategoryCard extends StatelessWidget {
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: AppTheme.primary.withOpacity(0.3),
+                color: AppTheme.primary.withValues(alpha: 0.3),
                 blurRadius: 16,
                 spreadRadius: 2,
               )
@@ -73,7 +73,7 @@ class CategoryCard extends StatelessWidget {
               Text(
                 category.id, // e.g. "Stories" in english
                 style: TextStyle(
-                  color: AppTheme.primary.withOpacity(0.8),
+                  color: AppTheme.primary.withValues(alpha: 0.8),
                   fontSize: 10,
                 ),
               )

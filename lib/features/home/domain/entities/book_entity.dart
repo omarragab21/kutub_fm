@@ -6,6 +6,8 @@ class BookEntity {
   final double rating;
   final String duration;
   final List<String> categoryIds;
+  final bool isBestOfMonth;
+  final bool isBestseller;
 
   BookEntity({
     required this.id,
@@ -15,5 +17,8 @@ class BookEntity {
     required this.rating,
     required this.duration,
     required this.categoryIds,
+    required this.isBestOfMonth,
+    required this.isBestseller,
   });
 }
+

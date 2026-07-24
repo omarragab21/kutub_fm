@@ -267,8 +267,6 @@ class ReaderSessionsProvider extends ChangeNotifier {
 
     final userProfile = await _getUserProfile();
     final newCommentId = 'comment_${DateTime.now().millisecondsSinceEpoch}';
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final userId = currentUser?.uid ?? 'unknown';
 
     final newComment = ReaderComment(
       id: newCommentId,

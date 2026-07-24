@@ -5,7 +5,7 @@ import 'package:kutub_fm/features/subscription/presentation/widgets/subscription
 import 'package:kutub_fm/features/subscription/presentation/screens/payment_method_screen.dart';
 
 class SubscriptionScreen extends StatelessWidget {
-  const SubscriptionScreen({Key? key}) : super(key: key);
+  const SubscriptionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +84,7 @@ class SubscriptionScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 8,
-                      shadowColor: const Color(0xFFD4AF37).withOpacity(0.5),
+                      shadowColor: const Color(0xFFD4AF37).withValues(alpha: 0.5),
                     ),
                     child: Text(
                       'المتابعة',

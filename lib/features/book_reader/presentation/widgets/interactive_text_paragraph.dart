@@ -45,11 +45,11 @@ class InteractiveTextParagraph extends StatelessWidget {
                 return TextSpan(
                   text: '${sentence.text} ',
                   style: TextStyle(
-                    color: isSelected ? Colors.white : AppTheme.primary.withOpacity(0.9),
+                    color: isSelected ? Colors.white : AppTheme.primary.withValues(alpha: 0.9),
                     fontSize: 22,
                     height: 1.8, // Comfortable reading height
                     backgroundColor: isSelected 
-                        ? AppTheme.primary.withOpacity(0.4) 
+                        ? AppTheme.primary.withValues(alpha: 0.4) 
                         : Colors.transparent,
                   ),
                   recognizer: TapGestureRecognizer()

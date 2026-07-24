@@ -1,9 +1,13 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../domain/entities/book_entity.dart';
+import '../../domain/entities/book_collection_entity.dart';
+import '../../domain/entities/category_entity.dart';
+import '../viewmodels/home_view_model.dart';
 import 'collection_details_screen.dart';
 
 class BookWorldScreen extends StatefulWidget {
@@ -17,77 +21,57 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
   String _selectedCategory = 'الكل';
   final Set<String> _likedBookIds = {};
 
-  final List<String> _categories = [
-    'الكل',
-    'خيال علمي',
-    'تشويق',
-    'رومانسي',
-    'اقتصاد',
-  ];
+  List<Map<String, dynamic>> _mapBooksToMockFormat(List<BookEntity> books) {
+    return books.map((b) => {
+      'id': b.id,
+      'title': b.title,
+      'author': b.author,
+      'cover': b.coverUrl,
+      'rating': b.rating,
+    }).toList();
+  }
 
-  // Mock books for Book World Screen
-  final List<Map<String, dynamic>> _allBooks = [
-    {
-      'id': 'w_1',
-      'title': 'تطوير المهارات القيادية',
-      'author': 'خالد العتيبي',
-      'cover': 'assets/generated/lion_cover.png',
-      'category': 'خيال علمي', // For filtering purpose
-      'rating': 4.9,
-    },
-    {
-      'id': 'w_2',
-      'title': 'فن التفاوض في العلاقات',
-      'author': 'ليلى الكردي',
-      'cover': 'assets/generated/negotiation_cover.png',
-      'category': 'تشويق',
-      'rating': 4.8,
-    },
-    {
-      'id': 'w_3',
-      'title': 'استراتيجيات بناء الوقت',
-      'author': 'أحمد الحسين',
-      'cover': 'assets/generated/time_cover.png',
-      'category': 'رومانسي',
-      'rating': 4.7,
-    },
-    {
-      'id': 'w_4',
-      'title': 'رحلة في عالم الفلك',
-      'author': 'سامر عبد الله',
-      'cover': 'assets/generated/scooter_cover.png',
-      'category': 'اقتصاد',
-      'rating': 4.6,
-    },
-  ];
-
-  // Best this month books (Image 1 display)
-  final List<Map<String, dynamic>> _bestBooks = [
-    {
-      'id': 'best_5',
-      'title': 'النبض الرقمي',
-      'author': 'ليلى مصطفى',
-      'cover': 'assets/generated/knight_cover.png',
-    },
-    {
-      'id': 'best_4',
-      'title': 'رحلة في عالم الفلك',
-      'author': 'سامر عبد الله',
-      'cover': 'assets/generated/scooter_cover.png',
-    },
-    {
-      'id': 'best_8',
-      'title': 'فن الإقناع والتأثير',
-      'author': 'نورهان عبد الرحمن',
-      'cover': 'assets/generated/black_box_cover.png',
-    },
-  ];
+  List<String> _getCollectionCovers(BookCollectionEntity collection, List<BookEntity> allBooks) {
+    final covers = <String>[];
+    for (final id in collection.bookIds) {
+      final BookEntity? book = allBooks.cast<BookEntity?>().firstWhere(
+        (b) => b?.id == id,
+        orElse: () => null,
+      );
+      if (book != null && book.coverUrl.isNotEmpty) {
+        covers.add(book.coverUrl);
+      }
+      if (covers.length >= 3) break;
+    }
+    while (covers.length < 3) {
+      covers.add('');
+    }
+    return covers;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+    final categories = ['الكل', ...viewModel.categories.map((c) => c.title)];
+
+    final allBooksMapped = _mapBooksToMockFormat(viewModel.recommendedBooks);
     final filteredBooks = _selectedCategory == 'الكل'
-        ? _allBooks
-        : _allBooks.where((b) => b['category'] == _selectedCategory).toList();
+        ? allBooksMapped
+        : _mapBooksToMockFormat(viewModel.recommendedBooks.where((b) {
+            final HomeCategory? cat = viewModel.categories.cast<HomeCategory?>().firstWhere(
+              (c) => c?.title == _selectedCategory,
+              orElse: () => null,
+            );
+            return cat != null && b.categoryIds.contains(cat.id);
+          }).toList());
+
+    final bestBooksMapped = _mapBooksToMockFormat(
+      viewModel.recommendedBooks.where((b) => b.isBestOfMonth).toList(),
+    );
+
+    final mostSellingBooksMapped = _mapBooksToMockFormat(
+      viewModel.recommendedBooks.where((b) => b.isBestseller).toList(),
+    );
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -111,7 +95,7 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
                 const SizedBox(height: 16),
 
                 // Categories Row
-                _buildCategoriesList(),
+                _buildCategoriesList(categories),
                 const SizedBox(height: 20),
 
                 // Top books list
@@ -122,11 +106,25 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
                 _buildSectionHeader(
                   title: 'الأفضل هذا الشهر',
                   onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.bestThisMonth),
+                      Navigator.pushNamed(context, AppRoutes.bestThisMonth, arguments: false),
                 ),
                 const SizedBox(height: 16),
                 _buildHorizontalBookList(
-                  _bestBooks,
+                  bestBooksMapped,
+                  height: 230,
+                  isSmall: true,
+                ),
+                const SizedBox(height: 28),
+
+                // Most Selling Section
+                _buildSectionHeader(
+                  title: 'الأكثر مبيعاً',
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.bestThisMonth, arguments: true),
+                ),
+                const SizedBox(height: 16),
+                _buildHorizontalBookList(
+                  mostSellingBooksMapped,
                   height: 230,
                   isSmall: true,
                 ),
@@ -141,27 +139,21 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildCollectionCard(
-                  title: 'إدارة الأموال والغنى',
-                  subtitle: 'كيف تصبح غنياً في عالم يزداد فقراً',
-                  count: 12,
-                  covers: [
-                    'assets/generated/lion_cover.png',
-                    'assets/generated/black_box_cover.png',
-                    'assets/generated/investing_cover.png',
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildCollectionCard(
-                  title: 'قصص وأساطير',
-                  subtitle: 'دعنا نترك هذا العالم ولنغادر لعالم يسحرنا !',
-                  count: 4,
-                  covers: [
-                    'assets/generated/scooter_cover.png',
-                    'assets/generated/negotiation_cover.png',
-                    'assets/generated/knight_cover.png',
-                  ],
-                ),
+                if (viewModel.bookCollections.isNotEmpty) ...[
+                  ...viewModel.bookCollections.take(2).map((col) {
+                    final covers = _getCollectionCovers(col, viewModel.recommendedBooks);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildCollectionCard(
+                        id: col.id,
+                        title: col.title,
+                        subtitle: col.miniDescription,
+                        count: col.bookIds.length,
+                        covers: covers,
+                      ),
+                    );
+                  }),
+                ],
                 const SizedBox(height: 32),
               ],
             ),
@@ -248,15 +240,15 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
     );
   }
 
-  Widget _buildCategoriesList() {
+  Widget _buildCategoriesList(List<String> categories) {
     return SizedBox(
       height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
+        itemCount: categories.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final cat = _categories[index];
+          final cat = categories[index];
           final isSelected = _selectedCategory == cat;
 
           return GestureDetector(
@@ -310,10 +302,22 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
         itemBuilder: (context, index) {
           final book = books[index];
           final isLiked = _likedBookIds.contains(book['id']);
-          final isAsset = book['cover'].toString().startsWith('assets/');
-          final imageProvider = isAsset
-              ? AssetImage(book['cover']) as ImageProvider
-              : NetworkImage(book['cover']) as ImageProvider;
+          final coverUrl = book['cover'].toString();
+          final isAsset = coverUrl.startsWith('assets/');
+          final isValidNetworkUrl = coverUrl.isNotEmpty && 
+                                    !coverUrl.startsWith('file://') &&
+                                    (coverUrl.startsWith('http://') || coverUrl.startsWith('https://'));
+          
+          final ImageProvider imageProvider;
+          if (coverUrl.isEmpty) {
+            imageProvider = const AssetImage('assets/book.png');
+          } else if (isAsset) {
+            imageProvider = AssetImage(coverUrl);
+          } else if (isValidNetworkUrl) {
+            imageProvider = NetworkImage(coverUrl);
+          } else {
+            imageProvider = const AssetImage('assets/book.png');
+          }
 
           return SizedBox(
             width: 104.w,
@@ -465,6 +469,7 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
   }
 
   Widget _buildCollectionCard({
+    required String id,
     required String title,
     required String subtitle,
     required int count,
@@ -474,7 +479,7 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
       onTap: () => Navigator.pushNamed(
         context,
         AppRoutes.collectionDetails,
-        arguments: CollectionDetailsArgs(title: title),
+        arguments: CollectionDetailsArgs(id: id, title: title),
       ),
       child: Container(
         width: double.infinity,
@@ -656,13 +661,22 @@ class _BookWorldScreenState extends State<BookWorldScreen> {
   }
 
   Widget _buildCoverItem(String coverAsset, {bool isMiddle = false}) {
+    final ImageProvider imageProvider;
+    if (coverAsset.isEmpty) {
+      imageProvider = const AssetImage('assets/book.png');
+    } else if (coverAsset.startsWith('assets/')) {
+      imageProvider = AssetImage(coverAsset);
+    } else {
+      imageProvider = NetworkImage(coverAsset);
+    }
+
     return Container(
       width: (isMiddle ? 120 : 110).w,
       height: (isMiddle ? 160 : 145).h,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12.r),
         image: DecorationImage(
-          image: AssetImage(coverAsset),
+          image: imageProvider,
           fit: BoxFit.cover,
         ),
         boxShadow: [

@@ -23,8 +23,8 @@ class ChapterListItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isCurrent 
-          ? AppTheme.primary.withOpacity(0.1) 
-          : (index % 2 == 0 ? Colors.transparent : AppTheme.surfaceContainerHighest.withOpacity(0.2)),
+          ? AppTheme.primary.withValues(alpha: 0.1) 
+          : (index % 2 == 0 ? Colors.transparent : AppTheme.surfaceContainerHighest.withValues(alpha: 0.2)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -105,7 +105,7 @@ class CommentListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceContainerHighest.withOpacity(0.2),
+        color: AppTheme.surfaceContainerHighest.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

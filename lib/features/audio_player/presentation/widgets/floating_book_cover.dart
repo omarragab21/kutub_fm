@@ -92,12 +92,12 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                 width: 220,
                 height: 330, // 2:3 aspect ratio
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05), // بلون خافت
+                  color: Colors.white.withValues(alpha: 0.05), // بلون خافت
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     // Primary shadow
                     BoxShadow(
-                      color: Colors.black.withOpacity(_shadowAnimation.value),
+                      color: Colors.black.withValues(alpha: _shadowAnimation.value),
                       blurRadius: 50,
                       spreadRadius: -15,
                       offset: Offset(
@@ -108,14 +108,14 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                     // Ambient glow effect when playing
                     if (widget.isPlaying)
                       BoxShadow(
-                        color: const Color(0xFFF2CA50).withOpacity(_shadowAnimation.value * 0.25), // 0.025 to 0.075 (faint animated glow)
+                        color: const Color(0xFFF2CA50).withValues(alpha: _shadowAnimation.value * 0.25), // 0.025 to 0.075 (faint animated glow)
                         blurRadius: 40,
                         spreadRadius: 8,
                         offset: const Offset(0, 0),
                       ),
                     // Subtle colored shadow (faint)
                     BoxShadow(
-                      color: const Color(0xFFF2CA50).withOpacity(0.03),
+                      color: const Color(0xFFF2CA50).withValues(alpha: 0.03),
                       blurRadius: 20,
                       spreadRadius: -5,
                       offset: const Offset(0, 10),
@@ -129,7 +129,9 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                     children: [
                       // Main image
                       Image.network(
-                        widget.imageUrl,
+                        widget.imageUrl.isEmpty || widget.imageUrl.startsWith('file://')
+                            ? 'https://via.placeholder.com/150'
+                            : widget.imageUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -138,8 +140,8 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  const Color(0xFFF2CA50).withOpacity(0.3),
-                                  const Color(0xFF131313).withOpacity(0.5),
+                                  const Color(0xFFF2CA50).withValues(alpha: 0.3),
+                                  const Color(0xFF131313).withValues(alpha: 0.5),
                                 ],
                               ),
                             ),
@@ -162,7 +164,7 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.1),
+                              Colors.black.withValues(alpha: 0.1),
                             ],
                           ),
                         ),
@@ -187,9 +189,9 @@ class _FloatingBookCoverState extends State<FloatingBookCover>
                                       0.5,
                                     ),
                                     colors: [
-                                      Colors.white.withOpacity(0.1),
+                                      Colors.white.withValues(alpha: 0.1),
                                       Colors.transparent,
-                                      Colors.white.withOpacity(0.05),
+                                      Colors.white.withValues(alpha: 0.05),
                                     ],
                                     stops: const [0.0, 0.5, 1.0],
                                   ),

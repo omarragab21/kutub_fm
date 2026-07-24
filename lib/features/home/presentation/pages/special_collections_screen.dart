@@ -1,8 +1,11 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../domain/entities/book_entity.dart';
+import '../../domain/entities/book_collection_entity.dart';
+import '../viewmodels/home_view_model.dart';
 import 'collection_details_screen.dart';
 
 class SpecialCollectionsScreen extends StatefulWidget {
@@ -14,41 +17,29 @@ class SpecialCollectionsScreen extends StatefulWidget {
 }
 
 class _SpecialCollectionsScreenState extends State<SpecialCollectionsScreen> {
-  final List<Map<String, dynamic>> _collections = [
-    {
-      'title': 'إدارة الأموال والغنى',
-      'subtitle': 'كيف تصبح غنياً في عالم يزداد فقراً',
-      'count': 12,
-      'covers': [
-        'assets/generated/lion_cover.png',
-        'assets/generated/black_box_cover.png',
-        'assets/generated/investing_cover.png',
-      ],
-    },
-    {
-      'title': 'قصص وأساطير',
-      'subtitle': 'دعنا نترك هذا العالم ولنغادر لعالم يسحرنا !',
-      'count': 4,
-      'covers': [
-        'assets/generated/scooter_cover.png',
-        'assets/generated/negotiation_cover.png',
-        'assets/generated/knight_cover.png',
-      ],
-    },
-    {
-      'title': 'أدب عربي',
-      'subtitle': 'حيث تحكي الكلمات ما عجز الزمن عن روايته.',
-      'count': 8,
-      'covers': [
-        'assets/generated/lion_cover.png',
-        'assets/generated/time_cover.png',
-        'assets/generated/negotiation_cover.png',
-      ],
-    },
-  ];
+  List<String> _getCollectionCovers(BookCollectionEntity collection, List<BookEntity> allBooks) {
+    final covers = <String>[];
+    for (final id in collection.bookIds) {
+      final BookEntity? book = allBooks.cast<BookEntity?>().firstWhere(
+        (b) => b?.id == id,
+        orElse: () => null,
+      );
+      if (book != null && book.coverUrl.isNotEmpty) {
+        covers.add(book.coverUrl);
+      }
+      if (covers.length >= 3) break;
+    }
+    while (covers.length < 3) {
+      covers.add('');
+    }
+    return covers;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+    final collections = viewModel.bookCollections;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -88,16 +79,18 @@ class _SpecialCollectionsScreenState extends State<SpecialCollectionsScreen> {
                     horizontal: 16.0,
                     vertical: 8.0,
                   ),
-                  itemCount: _collections.length,
+                  itemCount: collections.length,
                   separatorBuilder: (context, index) =>
                       const SizedBox(height: 16),
                   itemBuilder: (context, index) {
-                    final collection = _collections[index];
+                    final collection = collections[index];
+                    final covers = _getCollectionCovers(collection, viewModel.recommendedBooks);
                     return _buildCollectionCard(
-                      title: collection['title'],
-                      subtitle: collection['subtitle'],
-                      count: collection['count'],
-                      covers: List<String>.from(collection['covers']),
+                      id: collection.id,
+                      title: collection.title,
+                      subtitle: collection.miniDescription,
+                      count: collection.bookIds.length,
+                      covers: covers,
                     );
                   },
                 ),
@@ -159,6 +152,7 @@ class _SpecialCollectionsScreenState extends State<SpecialCollectionsScreen> {
   }
 
   Widget _buildCollectionCard({
+    required String id,
     required String title,
     required String subtitle,
     required int count,
@@ -169,7 +163,7 @@ class _SpecialCollectionsScreenState extends State<SpecialCollectionsScreen> {
         Navigator.pushNamed(
           context,
           AppRoutes.collectionDetails,
-          arguments: CollectionDetailsArgs(title: title),
+          arguments: CollectionDetailsArgs(id: id, title: title),
         );
       },
       child: Container(
@@ -352,13 +346,22 @@ class _SpecialCollectionsScreenState extends State<SpecialCollectionsScreen> {
   }
 
   Widget _buildCoverItem(String coverAsset, {bool isMiddle = false}) {
+    final ImageProvider imageProvider;
+    if (coverAsset.isEmpty) {
+      imageProvider = const AssetImage('assets/book.png');
+    } else if (coverAsset.startsWith('assets/')) {
+      imageProvider = AssetImage(coverAsset);
+    } else {
+      imageProvider = NetworkImage(coverAsset);
+    }
+
     return Container(
       width: (isMiddle ? 120 : 110).w,
       height: (isMiddle ? 160 : 145).h,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12.r),
         image: DecorationImage(
-          image: AssetImage(coverAsset),
+          image: imageProvider,
           fit: BoxFit.cover,
         ),
         boxShadow: [

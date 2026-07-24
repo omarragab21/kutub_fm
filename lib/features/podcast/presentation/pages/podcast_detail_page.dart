@@ -30,7 +30,11 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
     super.initState();
 
     final podcastProvider = context.read<PodcastProvider>();
-    _episode = podcastProvider.episodes.firstWhere((e) => e.id == widget.episodeId);
+    _episode = podcastProvider.getEpisodeById(widget.episodeId) ??
+        podcastProvider.allEpisodes.firstWhere(
+          (e) => e.id == widget.episodeId,
+          orElse: () => podcastProvider.allEpisodes.first,
+        );
 
     _isYoutube = _episode.youtubeUrl != null && _episode.youtubeUrl!.isNotEmpty;
     _isVideo = !_isYoutube && !_episode.audioUrl.endsWith('.mp3') && _episode.audioUrl.isNotEmpty;
@@ -145,6 +149,8 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
     final totalMs = duration.inMilliseconds > 0 ? duration.inMilliseconds : 1;
     final progress = (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
 
+    final authorName = episode.author ?? (episode.programTitle.isNotEmpty ? episode.programTitle : 'عامر واجد');
+
     return Column(
       children: [
         const SizedBox(height: 16),
@@ -157,7 +163,7 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
               borderRadius: BorderRadius.circular(24.0),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -201,11 +207,11 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFC00E).withOpacity(0.1),
+                color: const Color(0xFFFFC00E).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                episode.category,
+                'الموسم ${episode.season} • الحلقة ${episode.episodeNumber}',
                 style: const TextStyle(
                   color: Color(0xFFFFC00E),
                   fontSize: 11,
@@ -220,9 +226,9 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
               style: TextStyle(color: Colors.white54),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'عامر واجد',
-              style: TextStyle(
+            Text(
+              authorName,
+              style: const TextStyle(
                 color: Colors.white54,
                 fontSize: 14,
                 fontFamily: 'ThmanyahSans',
@@ -239,9 +245,9 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             activeTrackColor: const Color(0xFFFFC00E),
-            inactiveTrackColor: Colors.white.withOpacity(0.1),
+            inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
             thumbColor: const Color(0xFFFFC00E),
-            overlayColor: const Color(0xFFFFC00E).withOpacity(0.2),
+            overlayColor: const Color(0xFFFFC00E).withValues(alpha: 0.2),
           ),
           child: Slider(
             value: progress,
@@ -348,10 +354,16 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
   Widget build(BuildContext context) {
     final podcastProvider = context.watch<PodcastProvider>();
     final audioProvider = context.watch<AudioProvider>();
-    final episode = podcastProvider.episodes.firstWhere(
-      (e) => e.id == widget.episodeId,
-      orElse: () => _episode,
-    );
+
+    final episode = podcastProvider.getEpisodeById(widget.episodeId) ??
+        podcastProvider.allEpisodes.firstWhere(
+          (e) => e.id == widget.episodeId,
+          orElse: () => _episode,
+        );
+
+    final otherEpisodes = podcastProvider.allEpisodes
+        .where((e) => e.id != episode.id)
+        .toList();
 
     // Media header for Video/YouTube vs custom audio page
     final isVideoOrYoutube = _isYoutube || _isVideo;
@@ -476,6 +488,100 @@ class _PodcastDetailPageState extends State<PodcastDetailPage> {
                 episodeId: episode.id,
                 comments: episode.comments,
               ),
+
+              const SizedBox(height: 32),
+
+              // Other Episodes Section
+              if (otherEpisodes.isNotEmpty) ...[
+                const Text(
+                  'حلقات قد تهمك',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'ThmanyahSans',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: otherEpisodes.length,
+                    itemBuilder: (context, index) {
+                      final item = otherEpisodes[index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.pushReplacementNamed(
+                            context,
+                            '/podcast_detail',
+                            arguments: item.id,
+                          );
+                        },
+                        child: Container(
+                          width: 220,
+                          margin: const EdgeInsets.only(left: 12),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1F1F1F),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF333333)),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  item.imageUrl,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    width: 60,
+                                    height: 60,
+                                    color: const Color(0xFF2E2E2E),
+                                    child: const Icon(Icons.music_note_rounded, color: Colors.white38),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'الموسم ${item.season} • ${item.duration}',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFFC00E),
+                                        fontSize: 10,
+                                        fontFamily: 'ThmanyahSans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      item.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'ThmanyahSans',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ],
           ),
         ),

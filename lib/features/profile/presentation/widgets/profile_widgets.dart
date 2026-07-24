@@ -63,7 +63,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primary.withOpacity(0.4 + _glowController.value * 0.3),
+                      color: AppTheme.primary.withValues(alpha: 0.4 + _glowController.value * 0.3),
                       blurRadius: glowRadius,
                       spreadRadius: 2,
                     ),
@@ -95,7 +95,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget>
               widget.profile.bio!,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: Colors.white.withValues(alpha: 0.55),
                 fontSize: 13,
                 height: 1.5,
               ),
@@ -145,15 +145,15 @@ class StatsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final hours = profile.totalListeningMinutes ~/ 60;
     final minutes = profile.totalListeningMinutes % 60;
-    final listeningTimeStr = '${hours}س ${minutes}د';
+    final listeningTimeStr = '$hoursس $minutesد';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -187,13 +187,13 @@ class StatsWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
       ],
     );
   }
 
   Widget _buildDivider() =>
-      Container(width: 1, height: 40, color: Colors.white.withOpacity(0.08));
+      Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.08));
 }
 
 // ─── Continue Listening Carousel ────────────────────────────────────────────
@@ -212,7 +212,7 @@ class ContinueListeningCarousel extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        separatorBuilder: (_, _) => const SizedBox(width: 16),
         itemBuilder: (context, index) => _ContinueCard(item: items[index]),
       ),
     );
@@ -241,7 +241,7 @@ class _ContinueCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.network(item.coverUrl, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       color: AppTheme.surfaceContainerHighest,
                       child: const Icon(Icons.book, color: AppTheme.primary, size: 40),
                     )),
@@ -276,7 +276,7 @@ class _ContinueCard extends StatelessWidget {
                 Text(
                   '${(item.progress * 100).toInt()}% مكتمل',
                   style: TextStyle(
-                    color: AppTheme.primary.withOpacity(0.8),
+                    color: AppTheme.primary.withValues(alpha: 0.8),
                     fontSize: 11,
                   ),
                 ),
@@ -307,16 +307,16 @@ class ListeningHeatmap extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('النشاط الأسبوعي',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               )),
@@ -343,11 +343,11 @@ class ListeningHeatmap extends StatelessWidget {
                         end: Alignment.topCenter,
                         colors: [
                           AppTheme.primary,
-                          AppTheme.primary.withOpacity(0.4 + 0.6 * ratio),
+                          AppTheme.primary.withValues(alpha: 0.4 + 0.6 * ratio),
                         ],
                       ),
                       boxShadow: ratio > 0.5
-                          ? [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 8)]
+                          ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 8)]
                           : null,
                     ),
                   ),
@@ -355,7 +355,7 @@ class ListeningHeatmap extends StatelessWidget {
                   Text(
                     days[i].substring(0, 1),
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.45),
+                      color: Colors.white.withValues(alpha: 0.45),
                       fontSize: 10,
                     ),
                   ),
@@ -371,7 +371,7 @@ class ListeningHeatmap extends StatelessWidget {
                   color: Colors.deepOrange.shade400, size: 14),
               const SizedBox(width: 4),
               Text('استمعت هذا الأسبوع',
-                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
             ],
           ),
         ],

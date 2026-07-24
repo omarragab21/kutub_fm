@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/book_entity.dart';
 import '../../domain/entities/category_entity.dart';
+import '../../domain/entities/book_collection_entity.dart';
 import '../../domain/repositories/home_repository.dart';
 
 class HomeViewModel with ChangeNotifier {
@@ -10,11 +11,13 @@ class HomeViewModel with ChangeNotifier {
 
   List<HomeCategory> _categories = [];
   List<BookEntity> _recommendedBooks = [];
+  List<BookCollectionEntity> _bookCollections = [];
   bool _isLoading = false;
   String? _error;
 
   List<HomeCategory> get categories => _categories;
   List<BookEntity> get recommendedBooks => _recommendedBooks;
+  List<BookCollectionEntity> get bookCollections => _bookCollections;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -27,10 +30,12 @@ class HomeViewModel with ChangeNotifier {
       final results = await Future.wait([
         _repository.getCategories(),
         _repository.getRecommendedBooks(),
+        _repository.getBookCollections(),
       ]);
 
       _categories = results[0] as List<HomeCategory>;
       _recommendedBooks = results[1] as List<BookEntity>;
+      _bookCollections = results[2] as List<BookCollectionEntity>;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -39,3 +44,4 @@ class HomeViewModel with ChangeNotifier {
     }
   }
 }
+

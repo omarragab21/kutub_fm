@@ -30,6 +30,20 @@ class DiscoverBook {
   });
 }
 
+class _QuickCardImageSpec {
+  final double size;
+  final double left;
+  final double bottom;
+  final double angleDeg;
+
+  const _QuickCardImageSpec({
+    required this.size,
+    required this.left,
+    required this.bottom,
+    required this.angleDeg,
+  });
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -99,37 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // 1. Search Field
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.search),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1F1F1F),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.search,
-                          color: Color(0xFFBDBDBD),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'ابحث عن ما تريد...',
-                          style: TextStyle(
-                            color: Color(0xFFBDBDBD),
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildSearchBar(context),
                 const SizedBox(height: 16),
 
                 // 2. Bento Grid (2x2 Category Cards)
@@ -187,102 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(
                   height: 32,
                 ), // Add top spacing to match the bottom spacing
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 172,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF333333)),
-                        image: const DecorationImage(
-                          image: AssetImage('assets/podcasst.png'),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: -5,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: SizedBox(
-                          width: 170,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'استمع الى برامجك\nالمفضلة',
-                                style: TextStyle(
-                                  color: Color(0xFFF4F4F4),
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.5,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'حلقات حصرية على تطبيق كتب FM',
-                                style: TextStyle(
-                                  color: Color(0xFFBDBDBD),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w400,
-                                  height: 1.5,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 12),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.podcastList,
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFBD10),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SvgPicture.asset(
-                                        'assets/nav_radio.svg',
-                                        colorFilter: const ColorFilter.mode(
-                                          Color(0xFF1F1F1F),
-                                          BlendMode.srcIn,
-                                        ),
-                                        width: 20,
-                                        height: 20,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Text(
-                                        'تشغيل البودكاست',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF1F1F1F),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                _buildPodcastBanner(context),
                 const SizedBox(height: 32),
 
                 // 4. Continue Reading Header
@@ -291,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   'تابع القراءة',
                   'متابعة الكل',
                   onActionPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.search);
+                    Navigator.pushNamed(context, AppRoutes.continueReading);
                   },
                 ),
                 const SizedBox(height: 16),
@@ -330,52 +219,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildSearchBar(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1F1F1F),
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Row(
+          children: [
+            SvgPicture.asset(
+              'assets/search_01.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(
+                Color(0xFFBDBDBD),
+                BlendMode.srcIn,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'ابحث عن ما تريد...',
+              style: TextStyle(
+                color: Color(0xFFBDBDBD),
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const Map<String, _QuickCardImageSpec> _quickCardSpecs = {
+    'بودكاست': _QuickCardImageSpec(
+      size: 100,
+      left: -35,
+      bottom: -28,
+      angleDeg: -30,
+    ),
+    'كتب': _QuickCardImageSpec(size: 82, left: -6, bottom: -16, angleDeg: 5),
+    'مجتمع': _QuickCardImageSpec(
+      size: 90,
+      left: -24,
+      bottom: -22,
+      angleDeg: 12,
+    ),
+    'إذاعة': _QuickCardImageSpec(
+      size: 86,
+      left: -8,
+      bottom: -18,
+      angleDeg: 12,
+    ),
+  };
+
   Widget _buildCategoryCard({
     required String title,
     required Color backgroundColor,
     required String imagePath,
     required VoidCallback onTap,
   }) {
-    double imgSize = 90;
-    double imgLeft = -10;
-    double imgBottom = -10;
-    double rotationAngle = 0;
-
-    if (title == 'بودكاست') {
-      imgSize = 112;
-      imgLeft = -35;
-      imgBottom = -30;
-      rotationAngle = -30 * 3.14159265 / 180;
-    } else if (title == 'كتب') {
-      imgSize = 90;
-      imgLeft = -5;
-      imgBottom = -20;
-      rotationAngle = 5 * 3.14159265 / 180;
-    } else if (title == 'مجتمع') {
-      imgSize = 100;
-      imgLeft = -25;
-      imgBottom = -25;
-      rotationAngle = 12 * 3.14159265 / 180;
-    } else if (title == 'إذاعة') {
-      imgSize = 95;
-      imgLeft = -10;
-      imgBottom = -20;
-      rotationAngle = 12 * 3.14159265 / 180;
-    }
+    final spec = _quickCardSpecs[title] ??
+        const _QuickCardImageSpec(size: 90, left: -10, bottom: -10, angleDeg: 0);
 
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          children: [
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 74,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: spec.left,
+                bottom: spec.bottom,
+                child: Transform.rotate(
+                  angle: spec.angleDeg * 3.14159265 / 180,
+                  child: Image.asset(
+                    imagePath,
+                    height: spec.size,
+                    width: spec.size,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
-              child: Align(
+              Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 20),
@@ -384,26 +321,102 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: imgLeft,
-              bottom: imgBottom,
-              child: Transform.rotate(
-                angle: rotationAngle,
-                child: Image.asset(
-                  imagePath,
-                  height: imgSize,
-                  width: imgSize,
-                  fit: BoxFit.contain,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPodcastBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 172,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF333333)),
+        image: const DecorationImage(
+          image: AssetImage('assets/podcasst.png'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 170,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'استمع الى برامجك\nالمفضلة',
+                style: TextStyle(
+                  color: Color(0xFFF4F4F4),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'حلقات حصرية على تطبيق كتب FM',
+                style: TextStyle(
+                  color: Color(0xFFBDBDBD),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () =>
+                    Navigator.pushNamed(context, AppRoutes.podcastList),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFBD10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/nav_radio.svg',
+                        colorFilter: const ColorFilter.mode(
+                          Color(0xFF1F1F1F),
+                          BlendMode.srcIn,
+                        ),
+                        width: 20,
+                        height: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'تشغيل البودكاست',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1F1F1F),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -710,10 +723,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final hasProgress = progress > 0;
     final displayProgress = hasProgress ? progress : 0.75;
     final isLiked = _likedBookIds.contains(bookId);
+    final cardWidth =
+        (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 400.0);
 
     return Container(
-      width: 340,
-      height: 145, // increased height from 129 to 145
+      width: cardWidth,
+      height: 145,
       decoration: BoxDecoration(
         color: const Color(0xFF1F1F1F),
         borderRadius: BorderRadius.circular(12),
@@ -726,7 +741,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Cover Image (right in RTL) - Put it first so it is laid out on the right
             Container(
-              width: 95,
+              width: 113,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
@@ -737,11 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
                 image: DecorationImage(
-                  image: coverUrl.isEmpty
-                      ? const AssetImage('assets/book.png') as ImageProvider
-                      : (coverUrl.startsWith('assets/')
-                            ? AssetImage(coverUrl) as ImageProvider
-                            : NetworkImage(coverUrl) as ImageProvider),
+                  image: _getImageProvider(coverUrl),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -938,8 +949,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } else if (viewModel.recommendedBooks.isNotEmpty) {
-      final count = viewModel.recommendedBooks.length >= 2
-          ? 2
+      final count = viewModel.recommendedBooks.length >= 3
+          ? 3
           : viewModel.recommendedBooks.length;
       for (var i = 0; i < count; i++) {
         final item = viewModel.recommendedBooks[i];
@@ -948,15 +959,43 @@ class _HomeScreenState extends State<HomeScreen> {
           'title': item.title,
           'author': item.author,
           'coverUrl': item.coverUrl,
-          'progress': 0.75 - (i * 0.3),
-          'chapterId': '',
+          'progress': 0.65 - (i * 0.2),
+          'chapterId': item.id,
           'buttonText': 'إكمال القراءة',
         });
       }
     }
 
     if (items.isEmpty) {
-      return const SizedBox.shrink();
+      items.addAll([
+        {
+          'bookId': 'book_isolation',
+          'title': 'كيف تركت العزلة',
+          'author': 'رجب البابورجي',
+          'coverUrl': 'assets/profile/imgRectangle1.png',
+          'progress': 0.10,
+          'chapterId': '1',
+          'buttonText': 'إكمال القراءة',
+        },
+        {
+          'bookId': 'book_100_years',
+          'title': 'مئة عام من العزلة',
+          'author': 'أحمد خالد توفيق',
+          'coverUrl': 'assets/profile/imgImage26.png',
+          'progress': 0.45,
+          'chapterId': '2',
+          'buttonText': 'إكمال القراءة',
+        },
+        {
+          'bookId': 'book_season_migration',
+          'title': 'موسم الهجرة إلى الشمال',
+          'author': 'الطيب صالح',
+          'coverUrl': 'assets/profile/imgImage27.png',
+          'progress': 0.70,
+          'chapterId': '3',
+          'buttonText': 'إكمال القراءة',
+        },
+      ]);
     }
 
     return SizedBox(
@@ -1043,7 +1082,14 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     final List<BookEntity> books;
     if (_selectedCategoryId == 'for_you') {
-      books = viewModel.recommendedBooks;
+      final favoriteCategoryIds = viewModel.categories.map((c) => c.id).toSet();
+      if (favoriteCategoryIds.isNotEmpty) {
+        books = viewModel.recommendedBooks
+            .where((book) => book.categoryIds.any((id) => favoriteCategoryIds.contains(id)))
+            .toList();
+      } else {
+        books = viewModel.recommendedBooks;
+      }
     } else {
       books = viewModel.recommendedBooks
           .where((book) => book.categoryIds.contains(_selectedCategoryId))
@@ -1072,10 +1118,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final book = books[index];
           final isLiked = _likedBookIds.contains(book.id);
 
-          final isCoverAsset = book.coverUrl.startsWith('assets/');
-          final imageProvider = isCoverAsset
-              ? AssetImage(book.coverUrl) as ImageProvider
-              : NetworkImage(book.coverUrl) as ImageProvider;
+          final imageProvider = _getImageProvider(book.coverUrl);
 
           return SizedBox(
             width: 107,
@@ -1178,5 +1221,23 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  ImageProvider _getImageProvider(String url) {
+    if (url.isEmpty) {
+      return const AssetImage('assets/book.png');
+    }
+    if (url.startsWith('assets/')) {
+      return AssetImage(url);
+    }
+    if (url.startsWith('file://')) {
+      debugPrint('Invalid file URL passed to image loader: $url');
+      return const AssetImage('assets/book.png');
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return NetworkImage(url);
+    }
+    debugPrint('Unknown URL format: $url');
+    return const AssetImage('assets/book.png');
   }
 }

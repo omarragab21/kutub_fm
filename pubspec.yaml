@@ -64,6 +64,7 @@ dependencies:
   gal: ^2.3.0
   flutter_svg: ^2.3.0
   flutter_screenutil: ^5.9.3
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -110,6 +111,7 @@ flutter:
     - assets/generated/investing_cover.png
     - assets/generated/black_box_cover.png
     - assets/community/
+    - assets/community_hashtag.svg
     - assets/post_details/
     - assets/profile/
 

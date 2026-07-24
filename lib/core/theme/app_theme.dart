@@ -24,7 +24,6 @@ class AppTheme {
         primary: primary,
         primaryContainer: primaryContainer,
         onPrimary: onPrimary,
-        background: background,
         surface: surface,
         onSurface: onSurface,
         onSurfaceVariant: onSurfaceVariant,
@@ -52,10 +51,9 @@ class AppTheme {
         primary: primary,
         primaryContainer: primaryContainer,
         onPrimary: onPrimary,
-        background: const Color(0xFFF9F9F9),
-        surface: Colors.white,
-        onSurface: const Color(0xFF131313),
-        onSurfaceVariant: const Color(0xFF757575),
+        surface: Color(0xFFF9F9F9),
+        onSurface: Color(0xFF131313),
+        onSurfaceVariant: Color(0xFF757575),
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -207,7 +206,7 @@ class _WaveformPainter extends CustomPainter {
         ..strokeWidth = spacing * 0.8
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
-        ..color = AppTheme.primary.withOpacity(0.3);
+        ..color = AppTheme.primary.withValues(alpha: 0.3);
 
       canvas.drawLine(
         Offset(x, centerY - barHeight / 2),
@@ -238,7 +237,7 @@ class _WaveformPainter extends CustomPainter {
     // Inner bright core
     if (isPlaying && barHeight > 8) {
       final corePaint = Paint()
-        ..color = Colors.white.withOpacity(0.6)
+        ..color = Colors.white.withValues(alpha: 0.6)
         ..strokeWidth = spacing * 0.2
         ..strokeCap = StrokeCap.round;
 

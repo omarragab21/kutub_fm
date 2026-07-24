@@ -85,7 +85,7 @@ class LibraryHighlight {
 }
 
 class AudioLibraryViewModel extends ChangeNotifier {
-  // Navigation tabs: 0 = المفضلة (Favorites), 1 = التنزيلات (Downloads), 2 = الإشارات (Highlights)
+  // Navigation tabs: 0 = المفضلة (Favorites), 1 = الإشارات (Highlights)
   int _activeTabIndex = 0;
   int get activeTabIndex => _activeTabIndex;
 
@@ -197,7 +197,8 @@ class AudioLibraryViewModel extends ChangeNotifier {
     LibraryReel(
       id: 'fav_r2',
       bookTitle: 'العادات الذرية',
-      quote: '“التغيير يبدأ من أصغر عادة تقوم بها يوميًا، وليس من قرارات كبيرة.”',
+      quote:
+          '“التغيير يبدأ من أصغر عادة تقوم بها يوميًا، وليس من قرارات كبيرة.”',
       coverUrl: 'assets/cover_barefoot_bread.png',
     ),
     LibraryReel(
@@ -226,65 +227,14 @@ class AudioLibraryViewModel extends ChangeNotifier {
     ),
   ];
 
-  // 5. Downloaded Books List (التنزيلات)
-  final List<LibraryBook> _downloadedBooks = [
-    LibraryBook(
-      id: 'down_b1',
-      title: 'الأمير الصغير',
-      author: 'أنطوان دو سانت إكزوبيري',
-      coverUrl: 'assets/cover_jewish_girl.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-    LibraryBook(
-      id: 'down_b2',
-      title: 'الخيميائي',
-      author: 'باولو كويلو',
-      coverUrl: 'assets/cover_memory_body.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-    LibraryBook(
-      id: 'down_b3',
-      title: 'مئة عام من العزلة',
-      author: 'غابرييل غارسيا ماركيز',
-      coverUrl: 'assets/miah_aam_cover.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-    LibraryBook(
-      id: 'down_b4',
-      title: 'في انتظار البرابرة',
-      author: 'جوزيه ساراماغو',
-      coverUrl: 'assets/cover_salt_cities.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-    LibraryBook(
-      id: 'down_b5',
-      title: 'الطريق',
-      author: 'كورماك مكارثي',
-      coverUrl: 'assets/cover_barefoot_bread.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-    LibraryBook(
-      id: 'down_b6',
-      title: 'مدن الملح',
-      author: 'عبد الرحمن منيف',
-      coverUrl: 'assets/cover_thousand_nights.png',
-      progress: 1.0,
-      pdfAssetPath: 'book.pdf',
-    ),
-  ];
-
-  // 6. Highlights List (الإشارات)
+  // 5. Highlights List (الإشارات)
   final List<LibraryHighlight> _highlights = [
     LibraryHighlight(
       id: 'hl_1',
       bookTitle: 'الأمير الصغير',
       author: 'أنطوان دو سانت إكزوبيري',
-      quote: 'التركيز العميق أصبح مهارة نادرة… ومن يتقنه ينجز أكثر من الجميع في وقت أقل.',
+      quote:
+          'التركيز العميق أصبح مهارة نادرة… ومن يتقنه ينجز أكثر من الجميع في وقت أقل.',
       date: '12 نوفمبر',
       coverUrl: 'assets/cover_jewish_girl.png',
       colorHex: 0xFFF46D6E, // Red
@@ -329,7 +279,8 @@ class AudioLibraryViewModel extends ChangeNotifier {
       id: 'hl_6',
       bookTitle: 'مدن الملح',
       author: 'عبد الرحمن منيف',
-      quote: 'الذاكرة هي الجسر الذي يربط بين الماضي والحاضر، فتُحيي فينا الأمل والتجدد.',
+      quote:
+          'الذاكرة هي الجسر الذي يربط بين الماضي والحاضر، فتُحيي فينا الأمل والتجدد.',
       date: '12 يوليو',
       coverUrl: 'assets/cover_thousand_nights.png',
       colorHex: 0xFFFFDA62, // Yellow
@@ -339,9 +290,9 @@ class AudioLibraryViewModel extends ChangeNotifier {
   // Getters
   List<LibraryBook> get favoriteBooks => _favoriteBooks;
   List<LibraryPodcastShow> get favoritePodcastShows => _favoritePodcastShows;
-  List<LibraryPodcastEpisode> get favoritePodcastEpisodes => _favoritePodcastEpisodes;
+  List<LibraryPodcastEpisode> get favoritePodcastEpisodes =>
+      _favoritePodcastEpisodes;
   List<LibraryReel> get favoriteReels => _favoriteReels;
-  List<LibraryBook> get downloadedBooks => _downloadedBooks;
   List<LibraryHighlight> get highlights => _highlights;
 
   // Actions
@@ -375,11 +326,6 @@ class AudioLibraryViewModel extends ChangeNotifier {
 
   void toggleFavoriteReel(String id) {
     _favoriteReels.removeWhere((reel) => reel.id == id);
-    notifyListeners();
-  }
-
-  void deleteDownload(String id) {
-    _downloadedBooks.removeWhere((book) => book.id == id);
     notifyListeners();
   }
 

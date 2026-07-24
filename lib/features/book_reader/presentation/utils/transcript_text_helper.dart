@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/transcript_segment.dart';
 
@@ -10,9 +9,8 @@ class TranscriptTextHelper {
     int? activeId,
   }) {
     return segments.map((segment) {
-      final isArabic = _isArabic(segment.text);
       final bool isActive = activeId == segment.id;
-      
+
       TextStyle style = _getStyleForType(segment.type).copyWith(
         fontSize: fontSize,
         height: 1.6,
@@ -31,7 +29,7 @@ class TranscriptTextHelper {
       }
 
       return TextSpan(
-        text: segment.text + ' ',
+        text: '${segment.text} ',
         style: style,
       );
     }).toList();
